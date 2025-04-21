@@ -12,33 +12,31 @@ type NavigationProp = NativeStackNavigationProp<RootStackParamList, 'Splash'>;
 const SplashScreen = () => {
   const navigation = useNavigation<NavigationProp>();
   const fadeAnim = useRef(new Animated.Value(0)).current;
+  const animationRef = useRef<LottieView>(null);
 
   useEffect(() => {
-    const checkFirstTime = async () => {
+    const start = async () => {
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 800,
         useNativeDriver: true,
       }).start();
-
-      const hasLaunched = await AsyncStorage.getItem('hasLaunched');
+  
+      await AsyncStorage.setItem('hasLaunched', 'true');
+  
       setTimeout(() => {
-        if (!hasLaunched) {
-          AsyncStorage.setItem('hasLaunched', 'true');
-          navigation.replace('Signup');
-        } else {
-          navigation.replace('Login');
-        }
-      }, 3000); // animation duration
+        navigation.replace('Login');
+      }, 3000);
     };
-
-    checkFirstTime();
+  
+    start();
   }, []);
 
   return (
     <View style={styles.container}>
-      <Animated.View style={{ opacity: fadeAnim }}>
+      <Animated.View style={[styles.animated, { opacity: fadeAnim }]}>
         <LottieView
+          ref={animationRef}
           source={require('../assets/animations/wimbli-splash.json')}
           autoPlay
           loop={false}
@@ -56,6 +54,10 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  animated: {
+    width: '100%',
     alignItems: 'center',
   },
   lottie: {
