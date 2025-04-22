@@ -11,6 +11,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
 import { Feather } from '@expo/vector-icons'; // For icons
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { updateDoc, arrayUnion } from 'firebase/firestore';
 
 type Post = {
     id: string;
@@ -111,26 +113,23 @@ export default function HomeScreen() {
         let groupId = '';
       
         if (querySnapshot.empty) {
-          // Create new group
-          const docRef = await addDoc(groupRef, {
-            title: groupTitle,
-            createdAt: serverTimestamp(),
-            members: [userId],
-          });
-          groupId = docRef.id;
-        } else {
-          // Use existing group
-          const groupDoc = querySnapshot.docs[0];
-          groupId = groupDoc.id;
-      
-          const members = groupDoc.data().members || [];
-          if (!members.includes(userId)) {
-            await addDoc(collection(db, 'groups', groupId, 'members'), {
-              userId,
-              joinedAt: serverTimestamp(),
+            // Create new group with user as first member
+            const docRef = await addDoc(groupRef, {
+              title: groupTitle,
+              createdAt: serverTimestamp(),
+              members: [userId], // ✅ members array is created here
+            });
+            groupId = docRef.id;
+          } else {
+            const groupDoc = querySnapshot.docs[0];
+            groupId = groupDoc.id;
+          
+            // ✅ Instead of adding to a subcollection, update the main group doc's members array
+            const groupRef = doc(db, 'groups', groupId);
+            await updateDoc(groupRef, {
+              members: arrayUnion(userId),
             });
           }
-        }
       
         // Navigate to Messages screen with this group
         navigation.navigate('Chat', {
@@ -155,7 +154,7 @@ export default function HomeScreen() {
     }
 
     return (
-        <View style={[styles.container, { flex: 1, backgroundColor: currentTheme.background }]}>
+        <SafeAreaView style={[styles.container, { flex: 1, backgroundColor: currentTheme.background }]}>
             {/* Search Bar */}
             <View style={styles.searchContainer}>
                 <Feather name="search" size={20} color={currentTheme.textSecondary} style={styles.searchIcon} />
@@ -287,7 +286,7 @@ export default function HomeScreen() {
                     </View>
                 </TouchableOpacity>
             </Modal>
-        </View>
+        </SafeAreaView>
     );
 }
 

@@ -8,6 +8,7 @@ import { collection, addDoc, onSnapshot, orderBy, query, Timestamp, doc, getDoc 
 import { db, auth } from '../firebase';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
+import { setDoc } from 'firebase/firestore';
 
 interface Message {
   id: string;
@@ -90,6 +91,16 @@ export default function Chat() {
     };
   
     await addDoc(collection(db, 'groups', groupId, 'messages'), newMessage);
+
+    await setDoc(
+      doc(db, 'groups', groupId),
+      {
+        lastMessage: newMessage.text,
+        lastUpdated: newMessage.timestamp.toDate().toISOString(),
+      },
+      { merge: true }
+    );
+  
     setInput('');
   };
 

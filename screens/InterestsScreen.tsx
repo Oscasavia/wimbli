@@ -7,7 +7,10 @@ import { db, auth } from '../firebase';
 const INTEREST_OPTIONS = [
     'Poetry', 'Tennis', 'Coding', 'Volunteering',
     'Live Music', 'Book Clubs', 'Photography',
-    'Dancing', 'Spirituality', 'Outdoor Events'
+    'Dancing', 'Spirituality', 'Outdoor Events',
+    'Art', 'Sports', 'Games', 'Electronics',
+    'Automotive', 'Garden', 'Academics', 'Medical',
+    'Beauty', 'Pet', 'Food', 'Clothes'
 ];
 
 export default function InterestsScreen() {
@@ -126,7 +129,7 @@ const styles = StyleSheet.create({
     },
     continueButtonText: {
         color: 'white',
-        fontSize: 18,
+        fontSize: 16,
         fontWeight: 'bold',
     },
     disabledButton: {

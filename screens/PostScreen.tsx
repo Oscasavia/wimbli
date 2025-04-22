@@ -7,6 +7,7 @@ import { db, auth } from '../firebase';
 import { DateTimePickerAndroid } from '@react-native-community/datetimepicker';
 import { useRoute, useNavigation } from '@react-navigation/native';
 import { useFocusEffect } from '@react-navigation/native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { useCallback } from 'react';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
@@ -131,7 +132,8 @@ export default function PostScreen() {
 
     return (
         <ScrollView style={[styles.container, { backgroundColor: currentTheme.background }]}>
-            <Text style={[styles.title, { color: currentTheme.textPrimary }]}>
+            <SafeAreaView>
+            <Text style={[styles.title, { color: '#00796B' }]}>
                 {editPost ? 'Edit Post' : 'Create a New Post'}
             </Text>
 
@@ -192,12 +194,13 @@ export default function PostScreen() {
                     {editPost ? 'Update' : 'Post'}
                 </Text>
             </TouchableOpacity>
+            </SafeAreaView>
         </ScrollView>
     );
 }
 
 const styles = StyleSheet.create({
-    container: { flex: 1, padding: 20 },
+    container: { flex: 1, paddingHorizontal: 16, paddingTop: 10, },
     title: { fontSize: 22, fontWeight: 'bold', textAlign: 'center', marginBottom: 15 },
     label: { fontWeight: '600', marginTop: 10, marginBottom: 5 },
     input: {
