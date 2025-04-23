@@ -7,6 +7,8 @@ import { collection, deleteDoc, doc, onSnapshot, query, where } from 'firebase/f
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { FontAwesome } from '@expo/vector-icons';
 
 export default function ManagePostsScreen() {
     const navigation = useNavigation<any>();
@@ -43,11 +45,23 @@ export default function ManagePostsScreen() {
     };
 
     const renderPost = ({ item }: { item: any }) => (
-        <View style={[styles.card, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
-            <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{item.title}</Text>
+        <View style={[styles.card, { backgroundColor: '#f9f9f9', borderColor: currentTheme.inputBorder }]}>
+            {/* <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{item.title}</Text>
             <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary }]}>
                 {new Date(item.date).toLocaleString()}
-            </Text>
+            </Text> */}
+            <View style={styles.headerRow}>
+                <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>
+                    {item.title}
+                </Text>
+                <View style={{flexDirection:'row'}}>
+                    <FontAwesome name="calendar" flex='1' size={14} color="#888" style={{ marginRight: 6 }} />
+                    <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary, flex: 1}]}>
+                        {new Date(item.date).toLocaleString()}
+                    </Text>
+                </View>
+            </View>
+
             <Text style={[styles.cardDesc, { color: currentTheme.textPrimary }]}>{item.description}</Text>
             <View style={styles.separator} />
             <View style={styles.cardBottom}>
@@ -62,10 +76,10 @@ export default function ManagePostsScreen() {
                     <Text style={[styles.buttonText, { color: currentTheme.buttonText }]}>Edit</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                    style={[styles.deleteButton, { backgroundColor: '#FF6B6B' }]}
+                    style={[styles.deleteButton, { borderColor: '#FF6B6B', borderWidth: 1 }]}
                     onPress={() => confirmDelete(item.id)}
                 >
-                    <Text style={[styles.buttonText, { color: currentTheme.buttonText }]}>Delete</Text>
+                    <Text style={[styles.buttonText, { color: 'red' }]}>Delete</Text>
                 </TouchableOpacity>
             </View>
         </View>
@@ -82,27 +96,80 @@ export default function ManagePostsScreen() {
 
     if (posts.length === 0) {
         return (
-            <View style={[styles.center, { backgroundColor: currentTheme.background }]}>
-                <Text style={{ color: currentTheme.textSecondary }}>You haven't posted anything yet.</Text>
-            </View>
+            <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+                <Text style={[styles.title, { color: '#00796B' }]}>Manage Your Posts </Text>
+                
+                <View style={[styles.cardContainer, { backgroundColor: '#fff' }]}>
+                    <View style={[styles.center]}>
+                        <Text style={{ color: '#999', fontSize: 16 }}>You haven't posted anything yet.</Text>
+                    </View> 
+                </View>
+            </SafeAreaView>
         );
     }
 
     return (
-        <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={[styles.list, { backgroundColor: currentTheme.background }]}
-            renderItem={renderPost}
-        />
+        <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+            <Text style={[styles.title, { color: '#00796B' }]}>Manage Your Posts </Text>
+
+            <View style={[styles.cardContainer, { backgroundColor: '#fff' }]}>
+                <FlatList
+                    data={posts}
+                    keyExtractor={(item) => item.id}
+                    contentContainerStyle={[styles.list, { backgroundColor: '#fff' }]}
+                    renderItem={renderPost}
+                />
+            </View>
+        </SafeAreaView>
     );
 }
 
 const styles = StyleSheet.create({
-    list: { padding: 10 },
+    screen: {
+        flex: 1,
+        paddingTop: 10,
+        paddingHorizontal: 10,
+    },
+    title: {
+        fontSize: 22,
+        fontWeight: 'bold',
+        textAlign: 'center',
+        marginBottom: 10,
+    },
+    headerRow: {
+        marginBottom: 8,
+    },
+    cardTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        color: '#111',
+        marginBottom: 6, // separate title from date nicely
+    },
+    cardDateTime: {
+        fontSize: 13,
+        color: '#666',
+    },
+    dateRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    cardContainer: {
+        flex: 1,
+        borderTopLeftRadius: 20,
+        borderTopRightRadius: 20,
+        padding: 20,
+        marginTop: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: -2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 6,
+        elevation: 10,
+        width: '100%',
+    },
+    list: { paddingBottom: 10 },
     center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
     card: {
-        backgroundColor: '#f1f1f1',
         padding: 15,
         borderRadius: 12,
         marginBottom: 12,
@@ -110,10 +177,10 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: '#ddd',
     },
-    cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
-    cardDateTime: { color: '#555', fontSize: 13, marginBottom: 8 },
+    // cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
+    // cardDateTime: { color: '#555', fontSize: 13, marginBottom: 8 },
     cardDesc: { marginTop: 8, fontSize: 15, lineHeight: 22, marginBottom: 10 },
-    separator: { borderBottomWidth: 1, borderColor: '#eee', marginBottom: 10 },
+    separator: { borderBottomWidth: 1, borderColor: '#ddd', marginBottom: 10 },
     cardBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     cardCategory: { fontSize: 14, color: '#555' },
     cardFee: { fontSize: 14, fontWeight: 'bold', color: '#333' },
@@ -127,11 +194,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     deleteButton: {
-        backgroundColor: '#dc3545',
+        // backgroundColor: '#dc3545',
+        backgroundColor: '#fff',
         padding: 10,
         borderRadius: 8,
         flex: 1,
         alignItems: 'center',
+        borderColor: '#dc3545',
     },
     buttonText: { color: '#fff', fontWeight: 'bold' },
     cardShadow: {

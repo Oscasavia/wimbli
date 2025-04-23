@@ -6,7 +6,7 @@ import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
 import { auth } from '../firebase';
 import { useNavigation } from '@react-navigation/native';
 import CheckBox from 'expo-checkbox';
-import { FontAwesome } from '@expo/vector-icons';
+import { FontAwesome, MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export default function SignupScreen() {
@@ -56,7 +56,7 @@ export default function SignupScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-        <FontAwesome name="envelope" size={18} color="#777" style={styles.inputIcon} />
+        <MaterialIcons name="email" size={16} color="#777" style={styles.inputIcon} />
         <TextInput
             placeholder="Email Address"
             value={email}

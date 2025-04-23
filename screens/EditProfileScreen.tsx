@@ -8,11 +8,15 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 const INTEREST_OPTIONS = [
     'Poetry', 'Tennis', 'Coding', 'Volunteering',
     'Live Music', 'Book Clubs', 'Photography',
     'Dancing', 'Spirituality', 'Outdoor Events',
+    'Art', 'Sports', 'Games', 'Electronics',
+    'Automotive', 'Garden', 'Academics', 'Medical',
+    'Beauty', 'Pet', 'Food', 'Clothes'
 ];
 
 export default function EditProfileScreen({ navigation }: any) {

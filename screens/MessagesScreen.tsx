@@ -123,7 +123,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
     borderRadius: 10,
     paddingVertical: 12,
     fontSize: 16,
@@ -132,10 +132,15 @@ const styles = StyleSheet.create({
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
+    backgroundColor: '#f9f9f9',
     borderRadius: 10,
     paddingHorizontal: 12,
     marginBottom: 15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 6,
+    elevation: 3
   },
   searchIcon: {
     marginRight: 8,
@@ -189,7 +194,7 @@ const styles = StyleSheet.create({
   },
   discoverLink: {
     marginTop: 12,
-    color: '#007BFF',
+    color: '#FF7043',
     fontSize: 16,
     fontWeight: '600',
     textDecorationLine: 'underline',

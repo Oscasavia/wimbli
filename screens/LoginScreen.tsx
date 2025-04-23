@@ -38,7 +38,7 @@ export default function LoginScreen() {
         <Text style={styles.title}>Welcome Back!</Text>
 
         <View style={styles.inputContainer}>
-          <MaterialIcons name="email" size={20} color="#777" style={styles.inputIcon} />
+          <MaterialIcons name="email" size={20} color="#777" marginRight='4' />
           <TextInput
             placeholder="Email Address"
             placeholderTextColor="#888"
@@ -50,7 +50,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.inputContainer}>
-          <FontAwesome name="lock" size={20} color="#777" style={styles.inputIcon} />
+          <FontAwesome name="lock" size={20} color="#777" marginRight='8' marginLeft='3' />
           <TextInput
             placeholder="Password"
             placeholderTextColor="#888"
@@ -168,11 +168,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 15,
     color: '#757575',
+    fontSize: 16,
   },
   linkHighlight: {
     textAlign: 'center',
     marginTop: 15,
     color: '#FF7043',
     textDecorationLine: 'underline',
+    fontSize: 16,
   },
 });

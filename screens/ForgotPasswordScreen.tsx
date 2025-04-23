@@ -102,10 +102,10 @@ const styles = StyleSheet.create({
         shadowRadius: 10,
         elevation: 2,
     },
-        title: {
+    title: {
         fontSize: 22,
         fontWeight: 'bold',
-        marginBottom: 25,
+        marginBottom: 20,
         textAlign: 'center',
         color: '#757575',
     },
@@ -148,5 +148,6 @@ const styles = StyleSheet.create({
     link: {
         textAlign: 'center',
         color: '#757575',
+        fontSize: 16,
     },
 });
