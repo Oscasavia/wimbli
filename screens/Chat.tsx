@@ -1,14 +1,17 @@
-// Chat.tsx
+// Enhanced Chat.tsx with reply functionality
 import React, { useEffect, useRef, useState } from 'react';
 import {
-  View, Text, TextInput, TouchableOpacity, FlatList, KeyboardAvoidingView, Platform, StyleSheet, Image
+  View, Text, TextInput, TouchableOpacity, FlatList,
+  KeyboardAvoidingView, Platform, StyleSheet, Image
 } from 'react-native';
 import { useRoute } from '@react-navigation/native';
-import { collection, addDoc, onSnapshot, orderBy, query, Timestamp, doc, getDoc } from 'firebase/firestore';
+import {
+  collection, addDoc, onSnapshot, orderBy,
+  query, Timestamp, doc, getDoc, setDoc
+} from 'firebase/firestore';
 import { db, auth } from '../firebase';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
-import { setDoc } from 'firebase/firestore';
 
 interface Message {
   id: string;
@@ -16,7 +19,19 @@ interface Message {
   senderId: string;
   timestamp: Timestamp;
   senderName?: string;
+  replyToMessageText?: string;
+  replyToSenderName?: string;
 }
+
+const formatTimestamp = (timestamp: Timestamp) => {
+  const date = timestamp.toDate();
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+
+  return isToday
+    ? date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) // shows time like 2:00 PM
+    : date.toLocaleDateString([], { month: 'short', day: 'numeric' });     // shows date like Mar 20
+};
 
 export default function Chat() {
   const route = useRoute<any>();
@@ -24,33 +39,25 @@ export default function Chat() {
   const [groupName, setGroupName] = useState<string>(initialGroupName || 'Group Chat');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null);
   const flatListRef = useRef<FlatList>(null);
   const { theme } = useTheme();
   const currentTheme = theme === 'dark' ? darkTheme : lightTheme;
 
   useEffect(() => {
     const fetchGroupTitle = async () => {
-      try {
-        const groupDoc = await getDoc(doc(db, 'groups', groupId));
-        if (groupDoc.exists()) {
-          const data = groupDoc.data();
-          if (data?.title) setGroupName(data.title);
-        }
-      } catch (error) {
-        console.error('Failed to fetch group title:', error);
+      const groupDoc = await getDoc(doc(db, 'groups', groupId));
+      if (groupDoc.exists()) {
+        const data = groupDoc.data();
+        if (data?.title) setGroupName(data.title);
       }
     };
-  
     fetchGroupTitle();
   }, [groupId]);
 
   const fetchSenderName = async (senderId: string): Promise<string> => {
-    try {
-      const userDoc = await getDoc(doc(db, 'users', senderId));
-      return userDoc.exists() ? userDoc.data()?.username || 'Unknown' : 'Unknown';
-    } catch {
-      return 'Unknown';
-    }
+    const userDoc = await getDoc(doc(db, 'users', senderId));
+    return userDoc.exists() ? userDoc.data()?.username || 'Unknown' : 'Unknown';
   };
 
   useEffect(() => {
@@ -78,86 +85,96 @@ export default function Chat() {
     if (!input.trim()) return;
     const userId = auth.currentUser?.uid;
     if (!userId) return;
-  
+
     const userDoc = await getDoc(doc(db, 'users', userId));
     const userData = userDoc.exists() ? userDoc.data() : {};
-  
+
     const newMessage = {
       text: input.trim(),
       senderId: userId,
       senderName: userData.username || 'Unknown',
-      senderAvatar: userData.avatar || null, // avatar should be a URL
+      senderAvatar: userData.avatar || null,
       timestamp: Timestamp.now(),
+      ...(replyingTo && {
+        replyToMessageText: replyingTo.text,
+        replyToSenderName: replyingTo.senderName,
+      })
     };
-  
+
     await addDoc(collection(db, 'groups', groupId, 'messages'), newMessage);
 
-    await setDoc(
-      doc(db, 'groups', groupId),
-      {
-        lastMessage: newMessage.text,
-        lastUpdated: newMessage.timestamp.toDate().toISOString(),
-      },
-      { merge: true }
-    );
-  
+    await setDoc(doc(db, 'groups', groupId), {
+      lastMessage: newMessage.text,
+      lastUpdated: newMessage.timestamp.toDate().toISOString(),
+    }, { merge: true });
+
     setInput('');
+    setReplyingTo(null);
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: currentTheme.background }}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      keyboardVerticalOffset={80}
-    >
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: currentTheme.background }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={80}>
       <View style={styles.header}>
-        <Text style={[styles.headerText, { color: currentTheme.textPrimary }]}>
-          {groupName}
-        </Text>
+        <Text style={[styles.headerText, { color: currentTheme.textPrimary }]}>{groupName}</Text>
       </View>
+
       <FlatList
         ref={flatListRef}
         data={messages}
         keyExtractor={(item) => item.id}
         contentContainerStyle={{ padding: 10 }}
         renderItem={({ item }) => (
-          <View
-            style={[
+          <TouchableOpacity
+            onLongPress={() => setReplyingTo(item)}
+            delayLongPress={300}
+          >
+            <View style={[
               styles.messageContainer,
               { alignSelf: item.senderId === auth.currentUser?.uid ? 'flex-end' : 'flex-start' },
-            ]}
-          >
-            {item.senderId !== auth.currentUser?.uid && (
-              <View style={styles.senderInfo}>
-                {item.senderAvatar ? (
-                  <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, { backgroundColor: '#ccc' }]} />
+            ]}>
+              {item.senderId !== auth.currentUser?.uid && (
+                <View style={styles.senderInfo}>
+                  {item.senderAvatar ? (
+                    <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
+                  ) : (
+                    <View style={[styles.avatar, { backgroundColor: '#ccc' }]} />
+                  )}
+                  <Text style={[styles.senderName, { color: currentTheme.textSecondary }]}>
+                    {item.senderName || 'User'}
+                  </Text>
+                </View>
+              )}
+              <View style={[styles.messageBubble, {
+                backgroundColor: item.senderId === auth.currentUser?.uid ? currentTheme.primary : currentTheme.secondary,
+              }]}
+              >
+                {item.replyToMessageText && (
+                  <View style={styles.replyContainer}>
+                    <Text style={styles.replySender}>{item.replyToSenderName}</Text>
+                    <Text style={styles.replyText}>{item.replyToMessageText}</Text>
+                  </View>
                 )}
-                <Text style={[styles.senderName, { color: currentTheme.textSecondary }]}>
-                  {item.senderName || 'User'}
-                </Text>
+                <Text style={{ color: currentTheme.buttonText }}>{item.text}</Text>
+                <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
               </View>
-            )}
-            <View
-              style={[
-                styles.messageBubble,
-                {
-                  backgroundColor:
-                    item.senderId === auth.currentUser?.uid
-                      ? currentTheme.primary
-                      : currentTheme.secondary,
-                },
-              ]}
-            >
-              <Text style={{ color: currentTheme.buttonText }}>{item.text}</Text>
-              <Text style={styles.timestamp}>
-                {item.timestamp?.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-              </Text>
             </View>
-          </View>
+          </TouchableOpacity>
         )}
       />
+
+      {replyingTo && (
+        <View style={styles.replyPreview}>
+          <View>
+            <Text style={styles.replySender}>{replyingTo.senderName}</Text>
+            <Text style={styles.replyText} numberOfLines={1}>{replyingTo.text}</Text>
+          </View>
+          <TouchableOpacity onPress={() => setReplyingTo(null)}>
+            <Text style={styles.cancelReply}>Cancel</Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
       <View style={styles.inputContainer}>
         <TextInput
           value={input}
@@ -175,65 +192,20 @@ export default function Chat() {
 }
 
 const styles = StyleSheet.create({
-  header: {
-    paddingTop: 50,
-    paddingBottom: 15,
-    alignItems: 'center',
-    borderBottomWidth: 1,
-    borderColor: '#ccc',
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: 'bold',
-  },
-  messageBubble: {
-    marginVertical: 6,
-    padding: 12,
-    borderRadius: 12,
-    maxWidth: '75%',
-  },
-  inputContainer: {
-    flexDirection: 'row',
-    padding: 10,
-    borderTopWidth: 1,
-    borderColor: '#ccc',
-    alignItems: 'center',
-  },
-  textInput: {
-    flex: 1,
-    padding: 12,
-    borderRadius: 20,
-    fontSize: 16,
-    marginRight: 10,
-  },
-  sendButton: {
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 20,
-  },
-  messageContainer: {
-    marginVertical: 6,
-    maxWidth: '80%',
-  },
-  senderInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 2,
-  },
-  senderName: {
-    marginLeft: 6,
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  avatar: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-  },
-  timestamp: {
-    fontSize: 10,
-    marginTop: 4,
-    color: '#eee',
-    alignSelf: 'flex-end',
-  },
+  header: { paddingTop: 50, paddingBottom: 15, alignItems: 'center', borderBottomWidth: 1, borderColor: '#ccc' },
+  headerText: { fontSize: 18, fontWeight: 'bold' },
+  messageBubble: { marginVertical: 6, padding: 12, borderRadius: 12, maxWidth: '75%' },
+  inputContainer: { flexDirection: 'row', padding: 10, borderTopWidth: 1, borderColor: '#ccc', alignItems: 'center' },
+  textInput: { flex: 1, padding: 12, borderRadius: 20, fontSize: 16, marginRight: 10 },
+  sendButton: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 20 },
+  messageContainer: { marginVertical: 6, maxWidth: '80%' },
+  senderInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
+  senderName: { marginLeft: 6, fontSize: 12, fontWeight: '600' },
+  avatar: { width: 24, height: 24, borderRadius: 12 },
+  timestamp: { fontSize: 10, marginTop: 4, color: '#eee', alignSelf: 'flex-end' },
+  replyContainer: { borderLeftWidth: 3, borderLeftColor: '#ccc', paddingLeft: 8, marginBottom: 5 },
+  replySender: { fontWeight: 'bold', fontSize: 12, color: '#eee' },
+  replyText: { fontSize: 12, color: '#ddd' },
+  replyPreview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#eee', borderTopWidth: 1, borderColor: '#ccc' },
+  cancelReply: { color: 'red', fontSize: 14, marginLeft: 10 }
 });
