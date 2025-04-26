@@ -8,6 +8,8 @@ import { doc, getDoc, setDoc } from 'firebase/firestore';
 import { updateProfile } from 'firebase/auth';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 
 const INTEREST_OPTIONS = [
@@ -91,7 +93,12 @@ export default function EditProfileScreen({ navigation }: any) {
     };
 
     return (
-        <ScrollView contentContainerStyle={[styles.container, { backgroundColor: currentTheme.background }]}>
+        <LinearGradient
+            colors={['#E0F7FA', '#F5FDFD', '#ffffff']}
+            style={{ flex: 1 }}
+        >
+        <SafeAreaView style={[styles.container, { flex: 1, }]}>
+        <ScrollView contentContainerStyle={[styles.container, { backgroundColor: 'transparent' }]}>
             <TouchableOpacity onPress={pickImage} style={styles.avatarContainer}>
                 <Image
                     source={
@@ -168,6 +175,8 @@ export default function EditProfileScreen({ navigation }: any) {
                 </TouchableOpacity>
             </Modal>
         </ScrollView>
+        </SafeAreaView>
+        </LinearGradient>
     );
 }
 

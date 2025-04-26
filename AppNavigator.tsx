@@ -42,7 +42,7 @@ export default function AppNavigator() { // Or rename to export default function
           // Ensure iconName type is compatible with Ionicons name prop
           return <Ionicons name={iconName as any} size={size} color={color} />;
         },
-        tabBarActiveTintColor: '#007BFF',
+        tabBarActiveTintColor: '#00ACC1',
         tabBarInactiveTintColor: 'gray',
       })}
     >
@@ -52,7 +52,7 @@ export default function AppNavigator() { // Or rename to export default function
       <Tab.Screen name="Create" component={PostScreen} />
       <Tab.Screen name="Posts" component={ManagePostsScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-      <Tab.Screen name="Settings" component={SettingsScreen} />
+      {/* <Tab.Screen name="Settings" component={SettingsScreen} /> */}
     </Tab.Navigator>
   );
 }

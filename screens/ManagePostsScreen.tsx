@@ -9,6 +9,7 @@ import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FontAwesome } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function ManagePostsScreen() {
     const navigation = useNavigation<any>();
@@ -55,9 +56,9 @@ export default function ManagePostsScreen() {
                     {item.title}
                 </Text>
                 <View style={{flexDirection:'row'}}>
-                    <FontAwesome name="calendar" flex='1' size={14} color="#888" style={{ marginRight: 6 }} />
+                    <FontAwesome name="calendar" flex='1' size={14} color="#00ACC1" style={{ marginRight: 6 }} />
                     <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary, flex: 1}]}>
-                        {new Date(item.date).toLocaleString()}
+                    {new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                     </Text>
                 </View>
             </View>
@@ -109,18 +110,23 @@ export default function ManagePostsScreen() {
     }
 
     return (
-        <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
-            <Text style={[styles.title, { color: '#00796B' }]}>Manage Your Posts </Text>
+        <LinearGradient
+            colors={['#E0F7FA', '#F5FDFD', '#ffffff']}
+            style={{ flex: 1 }}
+        >
+            <SafeAreaView style={[styles.screen,]}>
+                <Text style={[styles.title, { color: '#00796B' }]}>Manage Your Posts </Text>
 
-            <View style={[styles.cardContainer, { backgroundColor: '#fff' }]}>
-                <FlatList
-                    data={posts}
-                    keyExtractor={(item) => item.id}
-                    contentContainerStyle={[styles.list, { backgroundColor: '#fff' }]}
-                    renderItem={renderPost}
-                />
-            </View>
-        </SafeAreaView>
+                <View style={[styles.cardContainer, { backgroundColor: '#fff' }]}>
+                    <FlatList
+                        data={posts}
+                        keyExtractor={(item) => item.id}
+                        contentContainerStyle={[styles.list, { backgroundColor: '#fff' }]}
+                        renderItem={renderPost}
+                    />
+                </View>
+            </SafeAreaView>
+        </LinearGradient>
     );
 }
 

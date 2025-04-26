@@ -11,6 +11,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors';
 import { Picker } from '@react-native-picker/picker';
+import { LinearGradient } from 'expo-linear-gradient';
 import { FontAwesome } from '@expo/vector-icons';
 
 const INTEREST_OPTIONS = [
@@ -138,67 +139,72 @@ export default function PostScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
-      <Text style={[styles.title, { color: '#00796B' }]}> {editPost ? 'Edit Post' : 'Create a New Post'} </Text>
+    <LinearGradient
+        colors={['#E0F7FA', '#F5FDFD', '#ffffff']}
+        style={{ flex: 1 }}
+    >
+        <SafeAreaView style={[styles.screen, ]}>
+            <Text style={[styles.title, { color: '#00796B' }]}> {editPost ? 'Edit Post' : 'Create a New Post'} </Text>
 
-      <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-        <View style={[styles.card, { backgroundColor: '#fff' }]}>
-          <View>
-            <TextInput
-              placeholder="Event title"
-              value={title}
-              onChangeText={setTitle}
-              style={[styles.input, { color: currentTheme.textPrimary }]}
-              placeholderTextColor={currentTheme.textSecondary}
-            />
-            <TextInput
-              placeholder="Description"
-              value={description}
-              onChangeText={setDescription}
-              style={[styles.input, { height: 80, color: currentTheme.textPrimary }]}
-              multiline
-              placeholderTextColor={currentTheme.textSecondary}
-            />
-            <TextInput
-              placeholder="Location"
-              value={location}
-              onChangeText={setLocation}
-              style={[styles.input, { color: currentTheme.textPrimary }]}
-              placeholderTextColor={currentTheme.textSecondary}
-            />
-            <TextInput
-              placeholder="Fee (leave blank for free)"
-              value={fee}
-              onChangeText={setFee}
-              keyboardType="numeric"
-              style={[styles.input, { color: currentTheme.textPrimary }]}
-              placeholderTextColor={currentTheme.textSecondary}
-            />
-            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Category</Text>
-            <View style={[styles.pickerContainer, { borderColor: currentTheme.inputBorder }]}>
-              <Picker
-                selectedValue={category}
-                onValueChange={(itemValue) => setCategory(itemValue)}
-                style={[styles.picker, { color: currentTheme.textPrimary }]}
-                dropdownIconColor={currentTheme.textPrimary}
-              >
-                <Picker.Item label="Select a category" value="" />
-                {INTEREST_OPTIONS.map((option) => (
-                  <Picker.Item key={option} label={option} value={option} />
-                ))}
-              </Picker>
-            </View>
-            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Date & Time</Text>
-            <TouchableOpacity onPress={openDatePicker} style={styles.input}>
-              <Text style={{ color: currentTheme.textPrimary }}>{date.toLocaleString()}</Text>
-            </TouchableOpacity>
-            <TouchableOpacity onPress={handlePost} disabled={loading} style={[styles.postButton, { backgroundColor: currentTheme.primary, opacity: loading ? 0.6 : 1 }]}>
-              <Text style={[styles.postButtonText, { color: currentTheme.buttonText }]}> {loading ? 'Posting...': editPost ? 'Update' : 'Post'} </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+            <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+                <View style={[styles.card, { backgroundColor: '#fff' }]}>
+                <View>
+                    <TextInput
+                    placeholder="Event title"
+                    value={title}
+                    onChangeText={setTitle}
+                    style={[styles.input, { color: currentTheme.textPrimary }]}
+                    placeholderTextColor={currentTheme.textSecondary}
+                    />
+                    <TextInput
+                    placeholder="Description"
+                    value={description}
+                    onChangeText={setDescription}
+                    style={[styles.input, { height: 80, color: currentTheme.textPrimary }]}
+                    multiline
+                    placeholderTextColor={currentTheme.textSecondary}
+                    />
+                    <TextInput
+                    placeholder="Location"
+                    value={location}
+                    onChangeText={setLocation}
+                    style={[styles.input, { color: currentTheme.textPrimary }]}
+                    placeholderTextColor={currentTheme.textSecondary}
+                    />
+                    <TextInput
+                    placeholder="Fee (leave blank for free)"
+                    value={fee}
+                    onChangeText={setFee}
+                    keyboardType="numeric"
+                    style={[styles.input, { color: currentTheme.textPrimary }]}
+                    placeholderTextColor={currentTheme.textSecondary}
+                    />
+                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Category</Text>
+                    <View style={[styles.pickerContainer, { borderColor: currentTheme.inputBorder }]}>
+                    <Picker
+                        selectedValue={category}
+                        onValueChange={(itemValue) => setCategory(itemValue)}
+                        style={[styles.picker, { color: currentTheme.textPrimary }]}
+                        dropdownIconColor={currentTheme.textPrimary}
+                    >
+                        <Picker.Item label="Select a category" value="" />
+                        {INTEREST_OPTIONS.map((option) => (
+                        <Picker.Item key={option} label={option} value={option} />
+                        ))}
+                    </Picker>
+                    </View>
+                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Date & Time</Text>
+                    <TouchableOpacity onPress={openDatePicker} style={styles.input}>
+                    <Text style={{ color: currentTheme.textPrimary }}>{date.toLocaleString()}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity onPress={handlePost} disabled={loading} style={[styles.postButton, { backgroundColor: currentTheme.primary, opacity: loading ? 0.6 : 1 }]}>
+                    <Text style={[styles.postButtonText, { color: currentTheme.buttonText }]}> {loading ? 'Posting...': editPost ? 'Update' : 'Post'} </Text>
+                    </TouchableOpacity>
+                </View>
+                </View>
+            </KeyboardAvoidingView>
+        </SafeAreaView>
+    </LinearGradient>
   );
 }
 

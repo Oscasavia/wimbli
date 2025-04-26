@@ -21,6 +21,7 @@ interface Message {
   senderName?: string;
   replyToMessageText?: string;
   replyToSenderName?: string;
+  likedBy?: string[];
 }
 
 const formatTimestamp = (timestamp: Timestamp) => {
@@ -43,6 +44,7 @@ export default function Chat() {
   const flatListRef = useRef<FlatList>(null);
   const { theme } = useTheme();
   const currentTheme = theme === 'dark' ? darkTheme : lightTheme;
+  let lastTap = 0;
 
   useEffect(() => {
     const fetchGroupTitle = async () => {
@@ -67,12 +69,20 @@ export default function Chat() {
       const msgs: Message[] = await Promise.all(
         snapshot.docs.map(async docSnap => {
           const data = docSnap.data();
-          const senderName = await fetchSenderName(data.senderId);
+          const senderDoc = await getDoc(doc(db, 'users', data.senderId));
+          const senderData = senderDoc.exists() ? senderDoc.data() : {};
+          const { text, senderId, timestamp, replyToMessageText, replyToSenderName, likedBy } = data;
           return {
             id: docSnap.id,
-            ...data,
-            senderName,
-          } as Message;
+            text,
+            senderId,
+            timestamp,
+            replyToMessageText,
+            replyToSenderName,
+            likedBy,
+            senderName: senderData.username || 'Unknown',
+            senderAvatar: senderData.profilePicture || null,
+          };
         })
       );
       setMessages(msgs);
@@ -80,6 +90,20 @@ export default function Chat() {
     });
     return unsubscribe;
   }, [groupId]);
+
+  const likeMessage = async (messageId: string, currentLikes: string[] = []) => {
+    const userId = auth.currentUser?.uid;
+    if (!userId) return;
+  
+    const messageRef = doc(db, 'groups', groupId, 'messages', messageId);
+    const isLiked = currentLikes.includes(userId);
+  
+    const updatedLikes = isLiked
+      ? currentLikes.filter(uid => uid !== userId)
+      : [...currentLikes, userId];
+  
+    await setDoc(messageRef, { likedBy: updatedLikes }, { merge: true });
+  };
 
   const sendMessage = async () => {
     if (!input.trim()) return;
@@ -126,6 +150,15 @@ export default function Chat() {
         contentContainerStyle={{ padding: 10 }}
         renderItem={({ item }) => (
           <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => {
+              const now = Date.now();
+              const DOUBLE_PRESS_DELAY = 300;
+              if (now - lastTap < DOUBLE_PRESS_DELAY) {
+                likeMessage(item.id, item.likedBy || []);
+              }
+              lastTap = now;
+            }}
             onLongPress={() => setReplyingTo(item)}
             delayLongPress={300}
           >
@@ -137,8 +170,14 @@ export default function Chat() {
                 <View style={styles.senderInfo}>
                   {item.senderAvatar ? (
                     <Image source={{ uri: item.senderAvatar }} style={styles.avatar} />
+                  ) : item.senderName ? (
+                    <View style={[styles.avatar, styles.initialsAvatar]}>
+                      <Text style={styles.initialsText}>
+                      {item.senderName.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)}
+                      </Text>
+                    </View>
                   ) : (
-                    <View style={[styles.avatar, { backgroundColor: '#ccc' }]} />
+                    <Image source={require('../assets/default-profile.png')} style={styles.avatar} />
                   )}
                   <Text style={[styles.senderName, { color: currentTheme.textSecondary }]}>
                     {item.senderName || 'User'}
@@ -158,6 +197,9 @@ export default function Chat() {
                 <Text style={{ color: currentTheme.buttonText }}>{item.text}</Text>
                 <Text style={styles.timestamp}>{formatTimestamp(item.timestamp)}</Text>
               </View>
+              {item.likedBy?.length > 0 && (
+                <Text style={styles.likeText}>❤️ {item.likedBy.length}</Text>
+              )}
             </View>
           </TouchableOpacity>
         )}
@@ -194,9 +236,9 @@ export default function Chat() {
 const styles = StyleSheet.create({
   header: { paddingTop: 50, paddingBottom: 15, alignItems: 'center', borderBottomWidth: 1, borderColor: '#ccc' },
   headerText: { fontSize: 18, fontWeight: 'bold' },
-  messageBubble: { marginVertical: 6, padding: 12, borderRadius: 12, maxWidth: '75%' },
+  messageBubble: { marginVertical: 0, padding: 12, borderRadius: 12, maxWidth: '75%' },
   inputContainer: { flexDirection: 'row', padding: 10, borderTopWidth: 1, borderColor: '#ccc', alignItems: 'center' },
-  textInput: { flex: 1, padding: 12, borderRadius: 20, fontSize: 16, marginRight: 10 },
+  textInput: { flex: 1, padding: 12, borderRadius: 20, fontSize: 16, marginRight: 10, borderWidth: 1, borderColor: '#ccc' },
   sendButton: { paddingVertical: 10, paddingHorizontal: 18, borderRadius: 20 },
   messageContainer: { marginVertical: 6, maxWidth: '80%' },
   senderInfo: { flexDirection: 'row', alignItems: 'center', marginBottom: 2 },
@@ -204,8 +246,22 @@ const styles = StyleSheet.create({
   avatar: { width: 24, height: 24, borderRadius: 12 },
   timestamp: { fontSize: 10, marginTop: 4, color: '#eee', alignSelf: 'flex-end' },
   replyContainer: { borderLeftWidth: 3, borderLeftColor: '#ccc', paddingLeft: 8, marginBottom: 5 },
-  replySender: { fontWeight: 'bold', fontSize: 12, color: '#eee' },
-  replyText: { fontSize: 12, color: '#ddd' },
-  replyPreview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#eee', borderTopWidth: 1, borderColor: '#ccc' },
-  cancelReply: { color: 'red', fontSize: 14, marginLeft: 10 }
+  replySender: { fontWeight: 'bold', fontSize: 12, color: '#ccc' },
+  replyText: { fontSize: 12, color: '#ccc' },
+  replyPreview: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 10, backgroundColor: '#fff', borderTopLeftRadius: 20, borderTopRightRadius: 20, borderWidth: 1, borderColor: '#ccc' },
+  cancelReply: { color: 'red', fontSize: 14, marginLeft: 10 },
+  likeText: {
+    fontSize: 12,
+    alignSelf: 'flex-end',
+  },
+  initialsAvatar: {
+    backgroundColor: '#666',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  initialsText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
+  },
 });

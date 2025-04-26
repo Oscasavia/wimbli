@@ -3,6 +3,8 @@ import { View, Text, StyleSheet, Switch, TouchableOpacity } from 'react-native';
 import { useTheme } from '../ThemeContext';
 import { lightTheme, darkTheme } from '../themeColors'; // Import theme colors
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'; // Import icons
+import { SafeAreaView } from 'react-native-safe-area-context'; // For status bar awareness
+import { LinearGradient } from 'expo-linear-gradient';
 
 export default function SettingsScreen() {
     const { theme, toggleTheme } = useTheme();
@@ -10,56 +12,61 @@ export default function SettingsScreen() {
     const currentTheme = isDark ? darkTheme : lightTheme;
 
     return (
-        <View style={[styles.container, { backgroundColor: currentTheme.background }]}>
-            <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Settings</Text>
+        <LinearGradient
+            colors={['#E0F7FA', '#F5FDFD', '#ffffff']}
+            style={{ flex: 1 }}
+        >
+            <SafeAreaView style={[styles.container]}>
+                <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Settings</Text>
 
-            {/* Dark Mode Setting */}
-            <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
-                <View style={styles.settingLabelContainer}>
-                    <Feather name="moon" size={24} color={currentTheme.textSecondary} style={styles.icon} />
-                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Dark Mode</Text>
+                {/* Dark Mode Setting */}
+                <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
+                    <View style={styles.settingLabelContainer}>
+                        <Feather name="moon" size={24} color={currentTheme.textSecondary} style={styles.icon} />
+                        <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Dark Mode</Text>
+                    </View>
+                    <Switch
+                        value={isDark}
+                        onValueChange={toggleTheme}
+                        thumbColor={isDark ? currentTheme.accent : currentTheme.primary}
+                        trackColor={{ false: '#767577', true: currentTheme.primary }}
+                    />
                 </View>
-                <Switch
-                    value={isDark}
-                    onValueChange={toggleTheme}
-                    thumbColor={isDark ? currentTheme.accent : currentTheme.primary}
-                    trackColor={{ false: '#767577', true: currentTheme.primary }}
-                />
-            </View>
 
-            {/* Account Settings (Placeholder for future) */}
-            <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
-                <View style={styles.settingLabelContainer}>
-                    <Feather name="user" size={24} color={currentTheme.textSecondary} style={styles.icon} />
-                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Account</Text>
+                {/* Account Settings (Placeholder for future) */}
+                <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
+                    <View style={styles.settingLabelContainer}>
+                        <Feather name="user" size={24} color={currentTheme.textSecondary} style={styles.icon} />
+                        <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Account</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => console.log('Navigate to Account Settings')}>
+                        <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => console.log('Navigate to Account Settings')}>
-                    <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
-                </TouchableOpacity>
-            </View>
 
-            {/* Notifications Settings (Placeholder for future) */}
-            <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
-                <View style={styles.settingLabelContainer}>
-                    <Feather name="bell" size={24} color={currentTheme.textSecondary} style={styles.icon} />
-                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Notifications</Text>
+                {/* Notifications Settings (Placeholder for future) */}
+                <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
+                    <View style={styles.settingLabelContainer}>
+                        <Feather name="bell" size={24} color={currentTheme.textSecondary} style={styles.icon} />
+                        <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Notifications</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => console.log('Navigate to Notification Settings')}>
+                        <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => console.log('Navigate to Notification Settings')}>
-                    <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
-                </TouchableOpacity>
-            </View>
 
-            {/* About Section (Placeholder for future) */}
-            <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
-                <View style={styles.settingLabelContainer}>
-                    <MaterialCommunityIcons name="information-outline" size={24} color={currentTheme.textSecondary} style={styles.icon} />
-                    <Text style={[styles.label, { color: currentTheme.textPrimary }]}>About</Text>
+                {/* About Section (Placeholder for future) */}
+                <View style={[styles.settingItem, { backgroundColor: currentTheme.inputBackground, borderColor: currentTheme.inputBorder }, styles.cardShadow]}>
+                    <View style={styles.settingLabelContainer}>
+                        <MaterialCommunityIcons name="information-outline" size={24} color={currentTheme.textSecondary} style={styles.icon} />
+                        <Text style={[styles.label, { color: currentTheme.textPrimary }]}>About</Text>
+                    </View>
+                    <TouchableOpacity onPress={() => console.log('Navigate to About')}>
+                        <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => console.log('Navigate to About')}>
-                    <Feather name="chevron-right" size={24} color={currentTheme.textSecondary} />
-                </TouchableOpacity>
-            </View>
-        </View>
+            </SafeAreaView>
+        </LinearGradient>
     );
 }
 

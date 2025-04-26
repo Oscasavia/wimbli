@@ -11,6 +11,7 @@ import { lightTheme, darkTheme } from '../themeColors';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect } from '@react-navigation/native';
 import { useCallback } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
 
 type Group = {
   id: string;
@@ -133,57 +134,62 @@ export default function MessagesScreen({ navigation }: any) {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: currentTheme.background }]}>
-      <Text style={styles.pageTitle}>Group Conversations</Text>
-      <View style={styles.searchBar}>
-        <FontAwesome name="search" size={18} color="#aaa" style={styles.searchIcon} />
-        <TextInput
-          placeholder="Search chats..."
-          placeholderTextColor="#aaa"
-          value={search}
-          onChangeText={setSearch}
-          style={styles.searchInput}
-        />
-      </View>
-      <FlatList
-  data={filteredGroups}
-  keyExtractor={(item) => item.id}
-  renderItem={({ item }) => (
-    <TouchableOpacity style={styles.row} onPress={() => handleOpenChat(item.id)}>
-      <View style={styles.avatar}>
-        <FontAwesome name="users" size={20} color="#fff" />
-      </View>
-      <View style={styles.textContainer}>
-        <View style={styles.titleRow}>
-          <Text style={styles.groupTitle}>{item.title}</Text>
-          {item.isUnread && <View style={styles.unreadDot} />}
+    <LinearGradient
+      colors={['#E0F7FA', '#F5FDFD', '#ffffff']}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={[styles.container,]}>
+        <Text style={styles.pageTitle}>Group Conversations</Text>
+        <View style={styles.searchBar}>
+          <FontAwesome name="search" size={18} color="#aaa" style={styles.searchIcon} />
+          <TextInput
+            placeholder="Search chats..."
+            placeholderTextColor="#aaa"
+            value={search}
+            onChangeText={setSearch}
+            style={styles.searchInput}
+          />
         </View>
-        <Text
-          style={[
-            styles.lastMessage,
-            item.isUnread && { fontWeight: 'bold', color: currentTheme.textPrimary },
-          ]}
-          numberOfLines={1}
-        >
-          {item.lastMessage || 'No messages yet'}
-        </Text>
-      </View>
-      <Text style={styles.dateText}>
-        {item.lastUpdated ? formatDate(item.lastUpdated) : ''}
-      </Text>
-    </TouchableOpacity>
-  )}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <FontAwesome name="comments-o" size={50} color="#ccc" style={{ marginBottom: 10 }} />
-            <Text style={styles.emptyText}>You haven't joined any group chats yet.</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('Home')}>
-              <Text style={styles.discoverLink}>Discover Events</Text>
+        <FlatList
+          data={filteredGroups}
+          keyExtractor={(item) => item.id}
+          renderItem={({ item }) => (
+            <TouchableOpacity style={styles.row} onPress={() => handleOpenChat(item.id)}>
+              <View style={styles.avatar}>
+                <FontAwesome name="users" size={20} color="#fff" />
+              </View>
+              <View style={styles.textContainer}>
+                <View style={styles.titleRow}>
+                  <Text style={styles.groupTitle}>{item.title}</Text>
+                  {item.isUnread && <View style={styles.unreadDot} />}
+                </View>
+                <Text
+                  style={[
+                    styles.lastMessage,
+                    item.isUnread && { fontWeight: 'bold', color: currentTheme.textPrimary },
+                  ]}
+                  numberOfLines={1}
+                >
+                  {item.lastMessage || 'No messages yet'}
+                </Text>
+              </View>
+              <Text style={styles.dateText}>
+                {item.lastUpdated ? formatDate(item.lastUpdated) : ''}
+              </Text>
             </TouchableOpacity>
-          </View>
-        }
-      />
-    </SafeAreaView>
+          )}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <FontAwesome name="comments-o" size={50} color="#ccc" style={{ marginBottom: 10 }} />
+              <Text style={styles.emptyText}>You haven't joined any group chats yet.</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('Home')}>
+                <Text style={styles.discoverLink}>Discover Events</Text>
+              </TouchableOpacity>
+            </View>
+          }
+        />
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
