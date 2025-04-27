@@ -57,6 +57,7 @@ export default function HomeScreen() {
   const [interests, setInterests] = useState<string[]>([]);
   const [selectedCategory, setSelectedCategory] = useState<string>("All");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [savedPosts, setSavedPosts] = useState<string[]>([]);
   const [searchText, setSearchText] = useState("");
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
@@ -198,6 +199,15 @@ export default function HomeScreen() {
     setModalVisible(true);
   };
 
+  const handleToggleSave = (postId: string) => {
+    setSavedPosts(
+      (prev) =>
+        prev.includes(postId)
+          ? prev.filter((id) => id !== postId) // unsave
+          : [...prev, postId] // save
+    );
+  };
+
   const handleJoinChat = async (post: Post | null) => {
     if (!post || !auth.currentUser) return;
 
@@ -325,14 +335,32 @@ export default function HomeScreen() {
                     styles.cardShadow,
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.cardTitle,
-                      { color: currentTheme.textPrimary },
-                    ]}
-                  >
-                    {item.title}
-                  </Text>
+                  <View style={styles.cardHeader}>
+                    <Text
+                      style={[
+                        styles.cardTitle,
+                        { color: currentTheme.textPrimary },
+                      ]}
+                    >
+                      {item.title}
+                    </Text>
+
+                    <TouchableOpacity
+                      onPress={() => handleToggleSave(item.id)}
+                      style={styles.saveIconButton}
+                    >
+                      <Feather
+                        name="bookmark"
+                        size={22}
+                        color={
+                          savedPosts.includes(item.id)
+                            ? "red"
+                            : currentTheme.textSecondary
+                        }
+                      />
+                    </TouchableOpacity>
+                  </View>
+
                   <View style={{ flexDirection: "row" }}>
                     <FontAwesome
                       name="calendar"
@@ -1210,5 +1238,14 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically using theme inputBackground
     borderWidth: 1,
     borderColor: "#eee",
+  },
+  cardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  saveIconButton: {
+    padding: 5,
   },
 });
