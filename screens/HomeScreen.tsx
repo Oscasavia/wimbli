@@ -252,8 +252,8 @@ export default function HomeScreen() {
                                 <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>
                                     {item.title}
                                 </Text>
-                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                    <FontAwesome name="calendar" size={14} color="#00ACC1" style={{ marginRight: 6 }} />
+                                <View style={{ flexDirection: 'row' }}>
+                                    <FontAwesome name="calendar" flex='1' size={14} color="#00ACC1" style={{ marginRight: 6 }} />
                                     <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary, flex: 1 }]}>
                                         {new Date(item.date).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
                                     </Text>
