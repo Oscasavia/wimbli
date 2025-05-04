@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react"; // Added useCallback
 import {
   View,
   Text,
@@ -16,269 +16,354 @@ import {
   onSnapshot,
   query,
   where,
+  Timestamp, // Import Timestamp for date handling
 } from "firebase/firestore";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { FontAwesome } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
+import { Feather } from "@expo/vector-icons"; // Use Feather icons
+// Removed LinearGradient
+
+// Define Post type for better type safety
+interface Post {
+    id: string;
+    title: string;
+    description: string;
+    category: string;
+    location: string; // Assuming location exists based on PostScreen
+    date: Timestamp | string; // Can be Timestamp or ISO string
+    fee: number;
+    createdBy: string;
+    // Add other fields if necessary
+}
+
 
 export default function ManagePostsScreen() {
   const navigation = useNavigation<any>();
-  const [posts, setPosts] = useState<any[]>([]);
+  const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
 
-  useEffect(() => {
-    const uid = auth.currentUser?.uid;
-    if (!uid) return;
+  // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const cardBorderColor = currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const errorColor = currentTheme.error || "#FF3B30"; // Theme error color or fallback
+  const shadowColor = currentTheme.shadowColor || "#000";
 
-    const q = query(collection(db, "posts"), where("createdBy", "==", uid));
+  useEffect(() => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !currentUser.uid) {
+        console.log("No user logged in.");
+        setLoading(false); // Stop loading if no user
+        // Optional: navigate to login or show message
+        return;
+    }
+
+    setLoading(true); // Ensure loading is true when starting fetch
+    const q = query(collection(db, "posts"), where("createdBy", "==", currentUser.uid));
+
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const userPosts: any[] = [];
-      snapshot.forEach((doc) => userPosts.push({ id: doc.id, ...doc.data() }));
+      const userPosts: Post[] = [];
+      snapshot.forEach((doc) => {
+          // Type assertion can be risky, better to validate structure if possible
+          userPosts.push({ id: doc.id, ...doc.data() } as Post);
+      });
+      // Sort posts, e.g., by date descending (most recent first)
+      userPosts.sort((a, b) => {
+         const dateA = a.date instanceof Timestamp ? a.date.toMillis() : new Date(a.date).getTime();
+         const dateB = b.date instanceof Timestamp ? b.date.toMillis() : new Date(b.date).getTime();
+         return dateB - dateA; // Descending order
+      });
       setPosts(userPosts);
       setLoading(false);
+    }, (error) => {
+        // Handle listener errors
+        console.error("Error fetching posts: ", error);
+        Alert.alert("Error", "Could not fetch your posts.");
+        setLoading(false);
     });
 
+    // Cleanup listener on unmount
     return () => unsubscribe();
-  }, []);
+  }, []); // Empty dependency array ensures this runs once on mount
 
   const confirmDelete = (id: string) => {
-    Alert.alert("Delete Post", "Are you sure you want to delete this post?", [
-      { text: "Cancel", style: "cancel" },
-      {
-        text: "Delete",
-        style: "destructive",
-        onPress: () => deleteDoc(doc(db, "posts", id)),
-      },
-    ]);
+    Alert.alert(
+      "Delete Post",
+      "Are you sure you want to permanently delete this post?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          style: "destructive",
+          onPress: async () => {
+            try {
+               // Optional: Add visual feedback during deletion
+               await deleteDoc(doc(db, "posts", id));
+               // No need to manually remove from state, onSnapshot listener handles it
+               // Alert.alert("Success", "Post deleted."); // Optional success message
+            } catch (error) {
+                console.error("Error deleting post: ", error);
+                Alert.alert("Error", "Failed to delete post.");
+            }
+          },
+        },
+      ]
+    );
   };
 
-  const renderPost = ({ item }: { item: any }) => (
-    <View
-      style={[
-        styles.card,
-        { backgroundColor: "#f9f9f9", borderColor: currentTheme.inputBorder },
-      ]}
-    >
-      {/* <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{item.title}</Text>
-            <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary }]}>
-                {new Date(item.date).toLocaleString()}
-            </Text> */}
-      <View style={styles.headerRow}>
-        <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>
-          {item.title}
-        </Text>
-        <View style={{ flexDirection: "row" }}>
-          <FontAwesome
-            name="calendar"
-            flex="1"
-            size={14}
-            color="#00ACC1"
-            style={{ marginRight: 6 }}
-          />
-          <Text
-            style={[
-              styles.cardDateTime,
-              { color: currentTheme.textSecondary, flex: 1 },
-            ]}
-          >
-            {new Date(item.date).toLocaleString([], {
-              dateStyle: "medium",
-              timeStyle: "short",
-            })}
-          </Text>
-        </View>
-      </View>
+  // --- Render Post Item ---
+  const renderPost = ({ item }: { item: Post }) => {
+    // Safely parse date
+    let displayDate = "Invalid Date";
+    try {
+        const dateObj = item.date instanceof Timestamp ? item.date.toDate() : new Date(item.date);
+         if (!isNaN(dateObj.getTime())) {
+            displayDate = dateObj.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+         }
+    } catch (e) { console.error("Date parsing error in renderPost:", e)}
 
-      <Text style={[styles.cardDesc, { color: currentTheme.textPrimary }]}>
-        {item.description}
-      </Text>
-      <View style={styles.separator} />
-      <View style={styles.cardBottom}>
-        <Text
-          style={[styles.cardCategory, { color: currentTheme.textSecondary }]}
-        >
-          {item.category}
-        </Text>
-        <Text style={[styles.cardFee, { color: currentTheme.textSecondary }]}>
-          {item.fee === 0 ? "Free" : `$${item.fee}`}
-        </Text>
-      </View>
-      <View style={styles.buttonRow}>
-        <TouchableOpacity
-          style={[styles.editButton, { backgroundColor: currentTheme.primary }]}
-          onPress={() => navigation.navigate("EditPost", { editPost: item })}
-        >
-          <Text style={[styles.buttonText, { color: currentTheme.buttonText }]}>
-            Edit
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[
-            styles.deleteButton,
-            { borderColor: "#FF6B6B", borderWidth: 1 },
-          ]}
-          onPress={() => confirmDelete(item.id)}
-        >
-          <Text style={[styles.buttonText, { color: "red" }]}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-
-  if (loading) {
     return (
-      <View
-        style={[styles.center, { backgroundColor: currentTheme.background }]}
-      >
-        <ActivityIndicator size="large" color={currentTheme.primary} />
-        <Text style={{ color: currentTheme.textSecondary }}>
-          Loading your posts...
-        </Text>
-      </View>
-    );
-  }
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
+          {/* Card Header: Title and Date */}
+          <View style={styles.cardHeader}>
+            <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]}>{item.title}</Text>
+            <View style={styles.dateTimeRow}>
+              <Feather name="calendar" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+              <Text style={[styles.cardDateTime, { color: currentTheme.textSecondary }]}>
+                {displayDate}
+              </Text>
+            </View>
+          </View>
 
-  if (posts.length === 0) {
-    return (
-      <SafeAreaView
-        style={[styles.screen, { backgroundColor: currentTheme.background }]}
-      >
-        <Text style={[styles.title, { color: "#00796B" }]}>
-          Manage Your Posts{" "}
-        </Text>
+          {/* Description */}
+          <Text style={[styles.cardDesc, { color: currentTheme.textSecondary }]} numberOfLines={3} ellipsizeMode="tail">
+            {item.description}
+          </Text>
 
-        <View style={[styles.cardContainer, { backgroundColor: "#fff" }]}>
-          <View style={[styles.center]}>
-            <Text style={{ color: "#999", fontSize: 16 }}>
-              You haven't posted anything yet.
-            </Text>
+          {/* Separator */}
+          <View style={[styles.separator, { backgroundColor: cardBorderColor }]} />
+
+          {/* Info Row: Category and Fee */}
+          <View style={styles.cardInfoRow}>
+             <View style={styles.infoItem}>
+                 <Feather name="tag" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]}>{item.category || 'N/A'}</Text>
+             </View>
+             <View style={styles.infoItem}>
+                 <Feather name="dollar-sign" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+                 <Text style={[styles.cardInfoText, { color: currentTheme.textPrimary, fontWeight: '600' }]}>
+                    {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+                 </Text>
+            </View>
+          </View>
+
+          {/* Action Buttons */}
+          <View style={styles.buttonRow}>
+            <TouchableOpacity
+              style={[styles.buttonBase, styles.editButton, { backgroundColor: currentTheme.primary }]}
+              onPress={() => navigation.navigate("EditPost", { editPost: item })} // Ensure 'EditPost' matches route name
+            >
+               <Feather name="edit-2" size={16} color={currentTheme.buttonText || '#fff'} style={styles.buttonIcon} />
+              <Text style={[styles.buttonText, { color: currentTheme.buttonText || '#fff' }]}>
+                Edit
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.buttonBase, styles.deleteButton, { borderColor: errorColor }]}
+              onPress={() => confirmDelete(item.id)}
+            >
+               <Feather name="trash-2" size={16} color={errorColor} style={styles.buttonIcon} />
+              <Text style={[styles.buttonText, { color: errorColor }]}>Delete</Text>
+            </TouchableOpacity>
           </View>
         </View>
+    );
+  };
+
+  // --- Loading State ---
+  if (loading) {
+    return (
+      <SafeAreaView style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+        <ActivityIndicator size="large" color={currentTheme.primary} />
+        <Text style={[styles.loadingText, { color: currentTheme.textSecondary }]}>
+          Loading your posts...
+        </Text>
       </SafeAreaView>
     );
   }
 
-  return (
-    <LinearGradient
-      colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView style={[styles.screen]}>
-        <Text style={[styles.title, { color: "#00796B" }]}>
-          Manage Your Posts{" "}
+  // --- Empty State ---
+  if (!loading && posts.length === 0) {
+    return (
+      <SafeAreaView style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+         <Feather name="clipboard" size={60} color={currentTheme.textSecondary} />
+        <Text style={[styles.emptyTitle, { color: currentTheme.textPrimary }]}>No Posts Yet</Text>
+        <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
+          You haven't created any posts. Create one from the Post tab!
         </Text>
-
-        <View style={[styles.cardContainer, { backgroundColor: "#fff" }]}>
-          <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={[styles.list, { backgroundColor: "#fff" }]}
-            renderItem={renderPost}
-          />
-        </View>
+         {/* Optional: Add a button to navigate to the post creation screen */}
+         {/* <TouchableOpacity
+              style={[styles.buttonBase, styles.createButton, { backgroundColor: currentTheme.primary, marginTop: 20 }]}
+              onPress={() => navigation.navigate('Post')} // Navigate to your Post creation screen
+            >
+              <Text style={[styles.buttonText, { color: currentTheme.buttonText || '#fff' }]}>
+                Create First Post
+              </Text>
+            </TouchableOpacity> */}
       </SafeAreaView>
-    </LinearGradient>
+    );
+  }
+
+  // --- Main List View ---
+  return (
+    <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+       {/* Screen Title */}
+       <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+          Manage Your Posts
+       </Text>
+      <FlatList
+        data={posts}
+        renderItem={renderPost}
+        keyExtractor={(item) => item.id}
+        contentContainerStyle={styles.listContainer}
+        showsVerticalScrollIndicator={false}
+      />
+    </SafeAreaView>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    paddingTop: 10,
-    paddingHorizontal: 10,
   },
-  title: {
-    fontSize: 22,
+  screenTitle: {
+    fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginBottom: 10,
+    marginVertical: 15,
+    paddingHorizontal: 20,
   },
-  headerRow: {
-    marginBottom: 8,
+  listContainer: {
+    paddingHorizontal: 16,
+    paddingTop: 10, // Add some padding at the top of the list
+    paddingBottom: 30, // Padding at the bottom
   },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#111",
-    marginBottom: 6, // separate title from date nicely
-  },
-  cardDateTime: {
-    fontSize: 13,
-    color: "#666",
-  },
-  dateRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 8,
-  },
-  cardContainer: {
+  centerContainer: { // Used for Loading and Empty states
     flex: 1,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
-    marginTop: 10,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 10,
-    width: "100%",
   },
-  list: { paddingBottom: 10 },
-  center: { flex: 1, justifyContent: "center", alignItems: "center" },
+  loadingText: {
+     marginTop: 15,
+     fontSize: 16,
+  },
+  emptyTitle: {
+     fontSize: 22,
+     fontWeight: 'bold',
+     marginTop: 20,
+     marginBottom: 10,
+     textAlign: 'center',
+  },
+  emptyText: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
   card: {
-    padding: 15,
+    padding: 16,
     borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
+    marginBottom: 16,
     borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  // cardTitle: { fontSize: 18, fontWeight: 'bold', marginBottom: 5 },
-  // cardDateTime: { color: '#555', fontSize: 13, marginBottom: 8 },
-  cardDesc: { marginTop: 8, fontSize: 15, lineHeight: 22, marginBottom: 10 },
-  separator: { borderBottomWidth: 1, borderColor: "#ddd", marginBottom: 10 },
-  cardBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardCategory: { fontSize: 14, color: "#555" },
-  cardFee: { fontSize: 14, fontWeight: "bold", color: "#333" },
-  buttonRow: {
-    flexDirection: "row",
-    marginTop: 15,
-    justifyContent: "space-between",
-  },
-  editButton: {
-    backgroundColor: "#007BFF",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    marginRight: 8,
-    alignItems: "center",
-  },
-  deleteButton: {
-    // backgroundColor: '#dc3545',
-    backgroundColor: "#fff",
-    padding: 10,
-    borderRadius: 8,
-    flex: 1,
-    alignItems: "center",
-    borderColor: "#dc3545",
-  },
-  buttonText: { color: "#fff", fontWeight: "bold" },
-  cardShadow: {
-    shadowColor: "#000",
+    // Dynamic background, border, shadow colors
+    // Shadow properties
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 2,
+    elevation: 3, // for Android shadow
   },
+  cardHeader: {
+    marginBottom: 10,
+  },
+  cardTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 6,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  cardDateTime: {
+    fontSize: 13,
+  },
+  cardDesc: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  separator: {
+    height: 1,
+    marginVertical: 10,
+    // Background color set dynamically
+  },
+  cardInfoRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 15, // Space before buttons
+    flexWrap: 'wrap', // Allow wrapping if content is long
+  },
+   infoItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginRight: 15, // Space between items if they wrap
+     marginBottom: 5, // Space if wrapping occurs
+   },
+  cardInfoText: {
+    fontSize: 14,
+  },
+  iconStyle: {
+    marginRight: 6, // Space between icon and text
+  },
+  buttonRow: {
+    flexDirection: "row",
+    justifyContent: "space-between", // Distribute buttons evenly
+    marginTop: 10, // Space above buttons
+  },
+  buttonBase: { // Base style for both buttons
+     flexDirection: 'row', // Icon and text side-by-side
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingVertical: 10,
+     paddingHorizontal: 15,
+     borderRadius: 8,
+     flex: 1, // Make buttons take equal width
+  },
+  editButton: {
+    marginRight: 8, // Space between buttons
+    // Background color set dynamically
+  },
+  deleteButton: {
+    marginLeft: 8, // Space between buttons
+    borderWidth: 1.5, // Make border slightly thicker for outline button
+    backgroundColor: 'transparent', // Outline button background
+    // Border color set dynamically
+  },
+  buttonText: {
+      fontWeight: 'bold',
+      fontSize: 15,
+      textAlign: 'center',
+  },
+  buttonIcon: {
+     marginRight: 8, // Space between icon and text in button
+  },
+  // createButton: { // Optional button style for empty state
+  //    paddingHorizontal: 30,
+  // },
 });

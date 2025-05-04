@@ -10,4 +10,8 @@ export type RootStackParamList = {
   Profile: undefined;
   EditProfile: undefined;
   ManagePosts: undefined;
+  Main: undefined;
+  SavedEvents: undefined;
+  HelpAndSupport: undefined;
+  AboutApp: undefined;
 };

@@ -7,15 +7,23 @@ import {
   Text,
   Alert,
   Image,
-  SafeAreaView
+  SafeAreaView, // Use the one from react-native-safe-area-context if installed, otherwise react-native
+  KeyboardAvoidingView,
+  ScrollView,
+  Platform,
+  ActivityIndicator,
+  Pressable, // For checkbox label tap
 } from "react-native";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
-import { auth } from "../firebase";
+import { auth, db } from "../firebase"; // Adjust path if needed
+import { doc, setDoc, Timestamp } from "firebase/firestore"; // Added setDoc
 import { useNavigation } from "@react-navigation/native";
-import { LinearGradient } from "expo-linear-gradient";
-import CheckBox from "expo-checkbox";
-import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import CheckBox from "expo-checkbox"; // Keep expo-checkbox
+import { Feather } from "@expo/vector-icons"; // Use Feather
+import { useTheme } from "../ThemeContext"; // Adjust path if needed
+import { lightTheme, darkTheme } from "../themeColors"; // Adjust path if needed
+// Removed LinearGradient, FontAwesome, MaterialIcons
+// Removed AsyncStorage if not used here
 
 export default function SignupScreen() {
   const [email, setEmail] = useState("");
@@ -25,299 +33,381 @@ export default function SignupScreen() {
   const [agreed, setAgreed] = useState(false);
   const [passwordVisible, setPasswordVisible] = useState(false);
   const [confirmPasswordVisible, setConfirmPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
   const navigation = useNavigation<any>();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const currentTheme = isDark ? darkTheme : lightTheme;
+
+  // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? '#1c1c1e' : '#ffffff');
+  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? '#2c2c2e' : '#f0f0f0');
+  const inputBorderColor = currentTheme.inputBorder || (isDark ? '#444' : '#ddd');
+  const placeholderTextColor = currentTheme.textSecondary || '#8e8e93';
+  const iconColor = currentTheme.textSecondary || '#8e8e93';
+  const shadowColor = currentTheme.shadowColor || '#000';
+  const linkColor = currentTheme.primary || '#007AFF';
+  const checkboxColor = currentTheme.primary || '#007AFF';
 
   const handleSignup = async () => {
-    if (!agreed)
-      return Alert.alert("You must agree to the Terms and Privacy Policy");
-    if (password !== confirmPassword)
-      return Alert.alert("Passwords do not match");
+    const trimmedEmail = email.trim();
+    const trimmedUsername = username.trim();
 
+    // Basic Validation
+    if (!trimmedEmail || !trimmedUsername || !password || !confirmPassword) {
+        Alert.alert("Missing Information", "Please fill in all fields.");
+        return;
+    }
+    if (!agreed) {
+      Alert.alert("Agreement Required", "You must agree to the Terms and Privacy Policy to sign up.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      Alert.alert("Password Mismatch", "Passwords do not match.");
+      return;
+    }
+    // Optional: Add password strength validation here
+
+    setIsLoading(true);
     try {
+      // 1. Create Auth User
       const userCred = await createUserWithEmailAndPassword(
         auth,
-        email,
+        trimmedEmail,
         password
       );
-      await updateProfile(userCred.user, { displayName: username });
-      navigation.replace("Interests");
+      const user = userCred.user;
+      console.log("Auth user created:", user.uid);
+
+      // 2. Update Auth Profile (Display Name)
+      await updateProfile(user, { displayName: trimmedUsername });
+      console.log("Auth profile updated with displayName:", trimmedUsername);
+
+       // 3. Create User Document in Firestore (Important!)
+       // Store username, email, initial interests (empty), etc.
+       const userDocRef = doc(db, "users", user.uid);
+       await setDoc(userDocRef, {
+           uid: user.uid,
+           username: trimmedUsername,
+           email: trimmedEmail,
+           createdAt: Timestamp.now(), // Use Firestore Timestamp
+           interests: [], // Initialize interests as empty
+           profilePicture: null, // Initialize profile picture
+           bio: "", // Initialize bio
+           // Add any other default fields needed
+       });
+       console.log("Firestore user document created:", user.uid);
+
+      // 4. Navigate to next step (e.g., Interest selection or Main App)
+      navigation.replace("Interests"); // Or 'Main' if skipping interests for now
+
     } catch (error: any) {
-      Alert.alert("Signup failed", error.message);
+      console.error("Signup Error:", error);
+      let errorMessage = "Signup failed. Please try again.";
+      // Provide more specific feedback
+      if (error.code === 'auth/email-already-in-use') {
+         errorMessage = "This email address is already registered. Please try logging in.";
+      } else if (error.code === 'auth/invalid-email') {
+         errorMessage = "Please enter a valid email address.";
+      } else if (error.code === 'auth/weak-password') {
+         errorMessage = "Password is too weak. Please choose a stronger password (at least 6 characters).";
+      }
+      Alert.alert("Signup Failed", errorMessage);
+    } finally {
+      setIsLoading(false);
     }
   };
 
   return (
-    <LinearGradient
-          colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
-          style={{ flex: 1 }}
-        >
-          <SafeAreaView style={styles.container}>
-      <View style={styles.logoContainer}>
-        <View style={styles.logoCircle}>
-          {/* <FontAwesome name="handshake-o" size={32} color="#00796B" /> */}
-          <Image
-            source={require("../assets/wimbli-icon-bg.png")}
-            style={{ width: 85, height: 85, resizeMode: "contain" }}
-          />
-        </View>
-        <Text style={styles.appName}>Wimbli</Text>
-      </View>
+     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+       <KeyboardAvoidingView
+         style={{ flex: 1 }}
+         behavior={Platform.OS === "ios" ? "padding" : "height"}
+         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
+       >
+         <ScrollView
+           contentContainerStyle={styles.scrollContainer}
+           keyboardShouldPersistTaps="handled"
+           showsVerticalScrollIndicator={false}
+         >
+           {/* Logo Area */}
+           <View style={styles.logoContainer}>
+              <View style={[styles.logoCircle, { backgroundColor: currentTheme.primary + '20' }]}>
+                <Image
+                  source={require("../assets/wimbli-icon-bg.png")} // Ensure path is correct
+                  style={styles.logoImage}
+                />
+              </View>
+             <Text style={[styles.appName, { color: currentTheme.primary }]}>Wimbli</Text>
+           </View>
 
-      <View style={styles.card}>
-        <Text style={styles.title}>Create Your Account</Text>
+           {/* Signup Card */}
+           <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
+             <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Create Your Account</Text>
 
-        <View style={styles.inputContainer}>
-          <FontAwesome
-            name="user"
-            size={20}
-            color="#777"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            placeholder="Username"
-            value={username}
-            onChangeText={setUsername}
-            style={styles.textInput}
-            placeholderTextColor="#888"
-          />
-        </View>
+             {/* Username Input */}
+             <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+                <Feather name="user" size={20} color={iconColor} style={styles.inputIcon} />
+               <TextInput
+                 placeholder="Username"
+                 placeholderTextColor={placeholderTextColor}
+                 style={[styles.textInput, { color: currentTheme.textPrimary }]}
+                 value={username}
+                 onChangeText={setUsername}
+                 autoCapitalize="none"
+                 textContentType="username" // Helps with autofill
+               />
+             </View>
 
-        <View style={styles.inputContainer}>
-          <MaterialIcons
-            name="email"
-            size={16}
-            color="#777"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            placeholder="Email Address"
-            value={email}
-            onChangeText={setEmail}
-            keyboardType="email-address"
-            style={styles.textInput}
-            placeholderTextColor="#888"
-          />
-        </View>
+             {/* Email Input */}
+             <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+                <Feather name="mail" size={20} color={iconColor} style={styles.inputIcon} />
+               <TextInput
+                 placeholder="Email Address"
+                 placeholderTextColor={placeholderTextColor}
+                 style={[styles.textInput, { color: currentTheme.textPrimary }]}
+                 value={email}
+                 onChangeText={setEmail}
+                 keyboardType="email-address"
+                 autoCapitalize="none"
+                 autoComplete="email"
+                 textContentType="emailAddress"
+               />
+             </View>
 
-        <View style={styles.passwordContainer}>
-          <FontAwesome
-            name="lock"
-            size={20}
-            color="#777"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            placeholder="Password"
-            secureTextEntry={!passwordVisible}
-            value={password}
-            onChangeText={setPassword}
-            style={styles.passwordInput}
-            placeholderTextColor="#888"
-          />
-          <TouchableOpacity
-            onPress={() => setPasswordVisible(!passwordVisible)}
-          >
-            <FontAwesome
-              name={passwordVisible ? "eye-slash" : "eye"}
-              size={20}
-              color="#777"
-              style={styles.inputIcon}
-            />
-          </TouchableOpacity>
-        </View>
+             {/* Password Input */}
+             <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+                <Feather name="lock" size={20} color={iconColor} style={styles.inputIcon} />
+               <TextInput
+                 placeholder="Password"
+                 placeholderTextColor={placeholderTextColor}
+                 style={[styles.textInput, { color: currentTheme.textPrimary }]}
+                 secureTextEntry={!passwordVisible}
+                 value={password}
+                 onChangeText={setPassword}
+                 autoCapitalize="none"
+                 textContentType="newPassword" // Hint for new password
+               />
+               <TouchableOpacity onPress={() => setPasswordVisible(!passwordVisible)} style={styles.eyeIconTouchable}>
+                  <Feather
+                    name={passwordVisible ? "eye-off" : "eye"}
+                    size={20}
+                    color={iconColor}
+                  />
+               </TouchableOpacity>
+             </View>
 
-        <View style={styles.passwordContainer}>
-          <FontAwesome
-            name="lock"
-            size={20}
-            color="#777"
-            style={styles.inputIcon}
-          />
-          <TextInput
-            placeholder="Confirm Password"
-            secureTextEntry={!confirmPasswordVisible}
-            value={confirmPassword}
-            onChangeText={setConfirmPassword}
-            style={styles.passwordInput}
-            placeholderTextColor="#888"
-          />
-          <TouchableOpacity
-            onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)}
-          >
-            <FontAwesome
-              name={confirmPasswordVisible ? "eye-slash" : "eye"}
-              size={20}
-              color="#777"
-              style={styles.inputIcon}
-            />
-          </TouchableOpacity>
-        </View>
+             {/* Confirm Password Input */}
+             <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+                <Feather name="lock" size={20} color={iconColor} style={styles.inputIcon} />
+               <TextInput
+                 placeholder="Confirm Password"
+                 placeholderTextColor={placeholderTextColor}
+                 style={[styles.textInput, { color: currentTheme.textPrimary }]}
+                 secureTextEntry={!confirmPasswordVisible}
+                 value={confirmPassword}
+                 onChangeText={setConfirmPassword}
+                 autoCapitalize="none"
+                 textContentType="newPassword"
+               />
+               <TouchableOpacity onPress={() => setConfirmPasswordVisible(!confirmPasswordVisible)} style={styles.eyeIconTouchable}>
+                  <Feather
+                    name={confirmPasswordVisible ? "eye-off" : "eye"}
+                    size={20}
+                    color={iconColor}
+                  />
+               </TouchableOpacity>
+             </View>
 
-        <View style={styles.checkboxContainer}>
-          <CheckBox
-            value={agreed}
-            onValueChange={setAgreed}
-            color={agreed ? "#00ACC1" : undefined}
-          />
-          <Text style={styles.checkboxLabel}>
-            I agree to the{" "}
-            <Text
-              style={styles.linkText}
-              onPress={() =>
-                navigation.navigate("WebView", {
-                  url: "https://cerulean-biscotti-582837.netlify.app/",
-                })
-              }
-            >
-              Terms
-            </Text>{" "}
-            and{" "}
-            <Text
-              style={styles.linkText}
-              onPress={() =>
-                navigation.navigate("WebView", {
-                  url: "https://lovely-unicorn-a7167c.netlify.app/",
-                })
-              }
-            >
-              Privacy Policy
-            </Text>
-          </Text>
-        </View>
+             {/* Terms & Privacy Checkbox */}
+              <View style={styles.checkboxContainer}>
+                <CheckBox
+                   value={agreed}
+                   onValueChange={setAgreed}
+                   color={agreed ? checkboxColor : undefined} // Apply theme color when checked
+                   style={styles.checkbox}
+                 />
+                 {/* Use Pressable for better tap handling on label */}
+                 <Pressable onPress={() => setAgreed(!agreed)} style={styles.checkboxLabelContainer}>
+                    <Text style={[styles.checkboxLabelBase, { color: currentTheme.textSecondary }]}>
+                      I agree to the{' '}
+                      <Text
+                        style={[styles.linkHighlight, { color: linkColor }]}
+                        onPress={() => navigation.navigate("WebView", { url: 'YOUR_TERMS_URL' })} // Replace with your actual URL
+                      >
+                        Terms
+                      </Text>
+                      {' '}and{' '}
+                       <Text
+                         style={[styles.linkHighlight, { color: linkColor }]}
+                         onPress={() => navigation.navigate("WebView", { url: 'YOUR_PRIVACY_URL' })} // Replace with your actual URL
+                       >
+                         Privacy Policy
+                       </Text>
+                    </Text>
+                </Pressable>
+              </View>
 
-        <TouchableOpacity style={styles.signupButton} onPress={handleSignup}>
-          <Text style={styles.signupButtonText}>Sign Up</Text>
-        </TouchableOpacity>
+             {/* Signup Button */}
+              <TouchableOpacity
+                  style={[
+                      styles.signupButton,
+                      { backgroundColor: currentTheme.primary },
+                      isLoading && styles.signupButtonDisabled
+                  ]}
+                  onPress={handleSignup}
+                  disabled={isLoading || !agreed} // Also disable if not agreed
+                  activeOpacity={0.8}
+              >
+                  {isLoading ? (
+                      <ActivityIndicator size="small" color={currentTheme.buttonText || '#fff'} />
+                  ) : (
+                      <Text style={[styles.signupButtonText, { color: currentTheme.buttonText || '#fff' }]}>Sign Up</Text>
+                  )}
+              </TouchableOpacity>
 
-        <Text style={styles.loginLink}>
-          Already have an account?{" "}
-          <Text
-            style={{ textDecorationLine: "underline", color: "#FF7043" }}
-            onPress={() => navigation.navigate("Login")}
-          >
-            Login
-          </Text>
-        </Text>
-      </View>
-    </SafeAreaView>
-    </LinearGradient>
-  );
-}
 
+             {/* Login Link */}
+              <View style={styles.loginLinkContainer}>
+                 <Text style={[styles.linkText, { color: currentTheme.textSecondary }]}>
+                   Already have an account?{' '}
+                 </Text>
+                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                    <Text style={[styles.linkText, styles.linkHighlight, { color: linkColor }]}>
+                      Login
+                    </Text>
+                 </TouchableOpacity>
+              </View>
+
+           </View>
+         </ScrollView>
+       </KeyboardAvoidingView>
+     </SafeAreaView>
+   );
+ }
+
+// --- Styles --- (Similar to LoginScreen styles, with additions/adjustments)
 const styles = StyleSheet.create({
-  container: {
+  screenContainer: {
     flex: 1,
-    // backgroundColor: "#E0F7FA",
-    justifyContent: "center",
-    alignItems: "center",
-    padding: 10,
+  },
+  scrollContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
   },
   logoContainer: {
-    alignItems: "center",
-    marginBottom: 20,
+    alignItems: 'center',
+    marginBottom: 25, // Adjusted margin
   },
   logoCircle: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "#B2EBF2",
-    alignItems: "center",
-    justifyContent: "center",
-    marginBottom: 8,
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 10,
+    // backgroundColor set dynamically
+  },
+  logoImage: {
+     width: 90,
+     height: 90,
+     resizeMode: 'contain',
   },
   appName: {
-    fontSize: 28,
-    fontWeight: "bold",
-    fontStyle: "italic",
-    color: "#00796B",
+    fontSize: 32,
+    fontWeight: 'bold',
+    // color set dynamically
   },
   card: {
-    width: "100%",
-    backgroundColor: "#fff",
+    width: '100%',
+    maxWidth: 400,
     borderRadius: 16,
     padding: 25,
-    shadowColor: "#000",
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 2,
+    // backgroundColor set dynamically
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
   },
   title: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 25,
-    textAlign: "center",
-    color: "#757575",
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 25, // Adjusted margin
+    textAlign: 'center',
+    // color set dynamically
   },
-  textInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#333",
-  },
-  passwordContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 15,
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
     borderWidth: 1,
-    borderColor: "#ddd",
     borderRadius: 10,
-    backgroundColor: "#f9f9f9",
-    paddingHorizontal: 10,
-  },
-  passwordInput: {
-    flex: 1,
-    paddingVertical: 12,
-    fontSize: 16,
-    color: "#333",
+    paddingHorizontal: 12,
+    marginBottom: 18, // Adjusted margin
+    height: 50,
+    // backgroundColor, borderColor set dynamically
   },
   inputIcon: {
     marginRight: 10,
   },
-  checkboxContainer: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    marginBottom: 20,
-  },
-  checkboxLabel: {
+  textInput: {
     flex: 1,
-    marginLeft: 10,
-    color: "#757575",
+    paddingVertical: 0,
     fontSize: 16,
+    // color set dynamically
   },
-  linkText: {
-    color: "#FF7043",
-    textDecorationLine: "underline",
+  eyeIconTouchable: {
+     padding: 5,
+     marginLeft: 5,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'center', // Align checkbox and text nicely
+    marginBottom: 25, // More space below checkbox
+    marginTop: 5, // Space above checkbox
+  },
+  checkbox: {
+    marginRight: 10,
+    // Apply size styling if needed, default might be small
+     width: 20, height: 20, // Example size
+  },
+  checkboxLabelContainer: { // Make label tappable
+    flex: 1,
+  },
+  checkboxLabelBase: { // Base style for label text
+    fontSize: 14, // Slightly smaller for terms
+    lineHeight: 20,
+    // color set dynamically (textSecondary)
   },
   signupButton: {
-    backgroundColor: "#00ACC1",
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingVertical: 14,
+    borderRadius: 25, // Consistent rounded button
+    alignItems: 'center',
+    marginTop: 10, // Space above button
+    // Dynamic background color
+  },
+  signupButtonDisabled: {
+     opacity: 0.7,
   },
   signupButtonText: {
-    color: "white",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: 'bold',
+    // color set dynamically
   },
-  loginLink: {
-    color: "#757575",
-    textAlign: "center",
-    fontSize: 16,
+   loginLinkContainer: {
+     flexDirection: 'row',
+     justifyContent: 'center',
+     alignItems: 'center',
+     marginTop: 25, // More space above login link
+   },
+  linkText: {
+    fontSize: 15,
+    // color set dynamically
   },
-  inputContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderColor: "#ddd",
-    borderWidth: 1,
-    borderRadius: 10,
-    paddingHorizontal: 10,
-    marginBottom: 15,
-    backgroundColor: "#f9f9f9",
+  linkHighlight: {
+    fontWeight: '600',
+    // color set dynamically (primary)
+     textDecorationLine: Platform.OS === 'ios' ? 'underline' : 'none', // Underline only on iOS? Optional.
   },
 });

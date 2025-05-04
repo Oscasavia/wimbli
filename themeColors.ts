@@ -16,6 +16,11 @@ export const lightTheme = {
     chipText: '#424242',
     chipSelectedBackground: '#FF7043',
     chipSelectedText: '#FFFFFF',
+    shadowColor: '#000', //***** fix */
+    cardBackground: '#fff',
+    error: '#FF3B30',
+    cardBorder: '#e0e0e0',
+    separator: '#e0e0e0'
 };
 
 export const darkTheme = {
@@ -34,6 +39,11 @@ export const darkTheme = {
     chipText: '#E0E0E0',
     chipSelectedBackground: '#FFAB91',
     chipSelectedText: '#212121',
+    shadowColor: '#000', //***** fix */
+    cardBackground: '#2a2a2a',
+    error: '#FF3B30',
+    cardBorder: '#3a3a3c',
+    separator: '#3a3a3c'
 };
 
 export type ThemeColors = typeof lightTheme; // Or darkTheme, they have the same structure

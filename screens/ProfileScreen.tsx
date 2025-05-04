@@ -7,20 +7,19 @@ import {
   TouchableOpacity,
   ActivityIndicator,
   ScrollView,
-  FlatList,
+  FlatList, // Keep import if used elsewhere, though not directly in this example output
   Modal,
-  Alert,
+  Alert, // Keep import if used elsewhere
   Pressable,
 } from "react-native";
 import { auth, db } from "../firebase";
-import { doc, getDoc, deleteDoc } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
-import { signOut, deleteUser } from "firebase/auth";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext";
-import { lightTheme, darkTheme } from "../themeColors";
-import { Feather, MaterialIcons } from "@expo/vector-icons"; // For icons
-import { SafeAreaView } from "react-native-safe-area-context"; // For status bar awareness
+import { lightTheme, darkTheme } from "../themeColors"; // Assuming themeColors defines cardBackground, chipBackground, chipText etc.
+import { Feather, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons"; // Added MaterialCommunityIcons for potential stats
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function ProfileScreen() {
@@ -35,52 +34,19 @@ export default function ProfileScreen() {
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
 
+  // --- Assume these are defined in your themeColors.js ---
+  // Add these fallbacks if they might be missing from your theme object
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#2a2a2a" : "#ffffff");
+  const chipBackgroundColor = currentTheme.chipBackground || (isDark ? "#3a3a3a" : "#f0f0f0");
+  const chipTextColor = currentTheme.chipText || currentTheme.textSecondary;
+  const shadowColor = currentTheme.shadowColor || "#000"; // Define shadow color in theme if needed
+
   const toggleModal = () => {
     setModalVisible(!isModalVisible);
   };
 
   const toggleSettingsMenu = () =>
     setSettingsMenuVisible(!isSettingsMenuVisible);
-
-  const handleLogout = async () => {
-    try {
-      await signOut(auth);
-      navigation.replace("Login");
-    } catch (error: any) {
-      Alert.alert("Logout Error", error.message);
-    }
-  };
-
-  const handleDeleteAccount = async () => {
-    Alert.alert(
-      "Delete Account",
-      "Are you sure you want to delete your account? This action is irreversible.",
-      [
-        {
-          text: "Cancel",
-          style: "cancel",
-        },
-        {
-          text: "Delete",
-          style: "destructive",
-          onPress: async () => {
-            const user = auth.currentUser;
-            if (user) {
-              try {
-                const uid = user.uid;
-                await deleteDoc(doc(db, "users", uid));
-                await deleteUser(user);
-                navigation.replace("Signup");
-              } catch (error: any) {
-                Alert.alert("Delete Account Error", error.message);
-              }
-            }
-          },
-        },
-      ],
-      { cancelable: false }
-    );
-  };
 
   const navigateToSettings = () => {
     setSettingsMenuVisible(false); // Close menu first
@@ -90,23 +56,40 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       const fetchUser = async () => {
+        setLoading(true); // Show loader when focus changes
         try {
           const uid = userId || auth.currentUser?.uid;
-          if (!uid) return;
+          if (!uid) {
+            console.log("No UID found");
+            setLoading(false);
+            return;
+          }
 
           const docSnap = await getDoc(doc(db, "users", uid));
           if (docSnap.exists()) {
             setUserData(docSnap.data());
+          } else {
+             console.log("No user data found in Firestore for UID:", uid);
+             // Set minimal data from auth if needed, or handle appropriately
+             setUserData({
+                 // You might want some fallback data if Firestore doc doesn't exist
+                 displayName: auth.currentUser?.displayName,
+                 email: auth.currentUser?.email,
+                 // profilePicture: auth.currentUser?.photoURL // If available
+             });
           }
-
-          setLoading(false);
         } catch (error) {
           console.error("Error loading profile:", error);
+          // Optionally set an error state here
+        } finally {
+          setLoading(false);
         }
       };
 
       fetchUser();
-    }, [])
+      // Clean-up function (optional)
+      // return () => { console.log("Profile screen unfocused"); };
+    }, [userId]) // Dependency array includes userId to refetch if navigating to a different profile
   );
 
   if (loading) {
@@ -119,13 +102,26 @@ export default function ProfileScreen() {
     );
   }
 
+  // --- Data Fallbacks ---
+  const profilePictureUri = userData?.profilePicture || null; // Use null if undefined
+  const displayName = userData?.displayName || auth.currentUser?.displayName || "User";
+  const userEmail = userData?.email || auth.currentUser?.email || "No email provided";
+  const userBio = userData?.bio || "No bio provided yet.";
+  const userInterests = userData?.interests || [];
+  // Placeholder Stats (replace with actual data if available)
+  const stats = {
+      posts: userData?.postCount || 0,
+      followers: userData?.followerCount || 0,
+      following: userData?.followingCount || 0,
+  };
+
+
   return (
-    <LinearGradient
-      colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView
-        style={[styles.safeArea, { backgroundColor: "transparent" }]}
+    // Use theme background instead of fixed gradient, or adjust gradient to use theme colors
+    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
+      <ScrollView
+        contentContainerStyle={styles.scrollContentContainer}
+        showsVerticalScrollIndicator={false}
       >
         {/* --- Settings Icon Button (Top Right) --- */}
         <TouchableOpacity
@@ -134,465 +130,409 @@ export default function ProfileScreen() {
         >
           <Feather
             name="more-vertical"
-            size={24}
+            size={28} // Slightly larger icon
             color={currentTheme.textPrimary}
           />
         </TouchableOpacity>
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollViewContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {/* Profile Header */}
-          <View style={styles.header}>
-            <TouchableOpacity onPress={toggleModal}>
-              <Image
-                source={
-                  userData?.profilePicture
-                    ? { uri: userData.profilePicture }
-                    : require("../assets/default-profile.png")
-                }
-                style={styles.avatar}
-              />
-            </TouchableOpacity>
-            <Text
-              style={[styles.username, { color: currentTheme.textPrimary }]}
-            >
-              {auth.currentUser?.displayName || "Not set"}
-            </Text>
-            <TouchableOpacity
-              onPress={() => navigation.navigate("EditProfile")}
-              style={styles.editButton}
-            >
-              <View style={styles.editButtonContainer}>
-                <Feather
-                  name="edit"
-                  size={20}
-                  color={currentTheme.textSecondary}
-                />
-              </View>
-            </TouchableOpacity>
-          </View>
 
-          {/* Email Section */}
-          <View
-            style={[
-              styles.infoSection,
-              {
-                backgroundColor: currentTheme.inputBackground,
-                ...styles.cardShadow,
-              },
-            ]}
-          >
-            <View style={styles.sectionHeader}>
-              <MaterialIcons
-                name="email"
-                size={20}
-                color={currentTheme.textSecondary}
-                style={styles.sectionIcon}
-              />
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: currentTheme.textPrimary },
-                ]}
-              >
-                Email
-              </Text>
-            </View>
-            <Text
-              style={[styles.infoText, { color: currentTheme.textSecondary }]}
-            >
-              {auth.currentUser?.email}
-            </Text>
-          </View>
+        {/* --- Profile Header --- */}
+        <View style={styles.profileHeader}>
+          <TouchableOpacity onPress={toggleModal} style={styles.avatarContainer}>
+            <Image
+              source={
+                profilePictureUri
+                  ? { uri: profilePictureUri }
+                  : require("../assets/default-profile.png")
+              }
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
 
-          {/* Bio Section */}
-          <View
-            style={[
-              styles.infoSection,
-              {
-                backgroundColor: currentTheme.inputBackground,
-                ...styles.cardShadow,
-              },
-            ]}
-          >
-            <View style={styles.sectionHeader}>
-              <Feather
-                name="user"
-                size={20}
-                color={currentTheme.textSecondary}
-                style={styles.sectionIcon}
-              />
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: currentTheme.textPrimary },
-                ]}
-              >
-                Bio
-              </Text>
-            </View>
-            <Text
-              style={[styles.bioText, { color: currentTheme.textSecondary }]}
-            >
-              {userData?.bio || "No bio yet"}
-            </Text>
-          </View>
+          <Text style={[styles.username, { color: currentTheme.textPrimary }]}>
+            {displayName}
+          </Text>
+          <Text style={[styles.email, { color: currentTheme.textSecondary }]}>
+            {userEmail}
+          </Text>
 
-          {/* Interests Section */}
-          <View
-            style={[
-              styles.infoSection,
-              {
-                backgroundColor: currentTheme.inputBackground,
-                ...styles.cardShadow,
-              },
-            ]}
-          >
-            <View style={styles.sectionHeader}>
-              <Feather
-                name="tag"
-                size={20}
-                color={currentTheme.textSecondary}
-                style={styles.sectionIcon}
-              />
-              <Text
-                style={[
-                  styles.sectionLabel,
-                  { color: currentTheme.textPrimary },
-                ]}
-              >
-                Interests
-              </Text>
+          {/* --- Edit Profile Button --- */}
+          {(!userId || userId === auth.currentUser?.uid) && ( // Only show Edit button on own profile
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("EditProfile")}
+                  style={[styles.editProfileButton, { backgroundColor: currentTheme.primary }]}
+                >
+                    <Feather name="edit-2" size={16} color={currentTheme.buttonText || '#ffffff'} style={{ marginRight: 8 }}/>
+                    <Text style={[styles.editProfileButtonText, { color: currentTheme.buttonText || '#ffffff' }]}>Edit Profile</Text>
+                </TouchableOpacity>
+           )}
+        </View>
+
+        {/* --- Stats Section (Placeholder) --- */}
+        {/* You'll need to fetch actual counts for these */}
+        <View style={[styles.statsContainer, styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
+            <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{stats.posts}</Text>
+                <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Posts</Text>
             </View>
-            <View style={styles.interestsContainer}>
-              {userData?.interests?.map((item: string) => (
+            <View style={styles.statSeparator}></View>
+            <View style={styles.statItem}>
+                <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{stats.followers}</Text>
+                <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Events Saved</Text>
+            </View>
+        </View>
+
+
+        {/* --- Bio Section --- */}
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
+             <MaterialCommunityIcons name="information-outline" size={20} color={currentTheme.textPrimary} /> Bio
+          </Text>
+          <Text style={[styles.bioText, { color: currentTheme.textSecondary }]}>
+            {userBio}
+          </Text>
+        </View>
+
+        {/* --- Interests Section --- */}
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
+             <MaterialCommunityIcons name="heart-multiple-outline" size={20} color={currentTheme.textPrimary} /> Interests
+          </Text>
+          {userInterests.length > 0 ? (
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+              {userInterests.map((interest: string) => (
                 <View
-                  key={item}
+                  key={interest}
                   style={[
                     styles.interestChip,
-                    { backgroundColor: currentTheme.chipBackground },
+                    {
+                      backgroundColor: chipBackgroundColor,
+                      borderColor: currentTheme.primary + '50', // Use primary color with opacity for border
+                    },
                   ]}
                 >
-                  <Text
-                    style={[
-                      styles.interestChipText,
-                      { color: currentTheme.chipText },
-                    ]}
-                  >
-                    {item}
+                  <Text style={[styles.interestChipText, { color: chipTextColor }]}>
+                    {interest}
                   </Text>
                 </View>
-              )) || (
-                <Text style={{ color: currentTheme.textSecondary }}>
-                  No interests selected yet.
-                </Text>
-              )}
-            </View>
-          </View>
+              ))}
+            </ScrollView>
+          ) : (
+             <Text style={[styles.placeholderText, { color: currentTheme.textSecondary }]}>No interests added yet.</Text>
+          )}
+        </View>
 
-          {/* Logout Button */}
-          <TouchableOpacity
-            onPress={handleLogout}
-            style={[
-              styles.actionButton,
-              { backgroundColor: currentTheme.secondary },
-            ]}
-          >
-            <Feather
-              name="log-out"
-              size={20}
-              color={currentTheme.buttonText}
-              style={styles.actionIcon}
-            />
-            <Text
-              style={[
-                styles.actionButtonText,
-                { color: currentTheme.buttonText },
-              ]}
-            >
-              Logout
+        {/* --- Saved Posts Section --- */}
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
+          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
+            <MaterialCommunityIcons name="bookmark-multiple-outline" size={20} color={currentTheme.textPrimary} /> Saved Events
+          </Text>
+          <TouchableOpacity onPress={() => navigation.navigate("SavedEvents")}>
+            <Text style={[styles.linkText, { color: currentTheme.primary }]}>
+              View your saved events
             </Text>
           </TouchableOpacity>
+           {/* Optional: Add a small preview of saved events here if feasible */}
+        </View>
 
-          {/* Delete Account Button */}
-          <TouchableOpacity
-            onPress={handleDeleteAccount}
-            style={[styles.actionButton, { backgroundColor: "#FF6B6B" }]}
-          >
-            <Feather
-              name="trash-2"
-              size={20}
-              color={currentTheme.buttonText}
-              style={styles.actionIcon}
-            />
-            <Text
-              style={[
-                styles.actionButtonText,
-                { color: currentTheme.buttonText },
-              ]}
-            >
-              Delete Account
-            </Text>
+        {/* Add some bottom padding to the scroll view */}
+         <View style={{ height: 30 }} />
+
+      </ScrollView>
+
+      {/* --- Full Image Modal --- */}
+      <Modal
+        animationType="fade" // Fade looks smoother
+        transparent={true}
+        visible={isModalVisible}
+        onRequestClose={toggleModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={toggleModal}>
+          <Image
+            source={
+              profilePictureUri
+                ? { uri: profilePictureUri }
+                : require("../assets/default-profile.png")
+            }
+            style={styles.fullImage}
+            resizeMode="contain"
+          />
+          <TouchableOpacity style={styles.closeButton} onPress={toggleModal}>
+            <MaterialIcons name="close" size={30} color="#fff" />
           </TouchableOpacity>
+        </Pressable>
+      </Modal>
 
-          {/* Full Image Modal */}
-          <Modal
-            animationType="slide"
-            transparent={true}
-            visible={isModalVisible}
-            onRequestClose={toggleModal}
-          >
-            <TouchableOpacity style={styles.modalOverlay} onPress={toggleModal}>
-              <View style={styles.modalContent}>
-                <Image
-                  source={
-                    userData?.profilePicture
-                      ? { uri: userData.profilePicture }
-                      : require("../assets/default-profile.png")
-                  }
-                  style={styles.fullImage}
-                  resizeMode="contain"
-                />
-              </View>
-            </TouchableOpacity>
-          </Modal>
-        </ScrollView>
-        {/* --- Settings Menu Modal --- */}
-        <Modal
-          animationType="fade"
-          transparent={true}
-          visible={isSettingsMenuVisible}
-          onRequestClose={toggleSettingsMenu}
+      {/* --- Settings Menu Modal --- */}
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={isSettingsMenuVisible}
+        onRequestClose={toggleSettingsMenu}
+      >
+        <Pressable // Use Pressable for overlay to dismiss
+          style={styles.settingsMenuOverlay}
+          onPress={toggleSettingsMenu}
         >
-          <Pressable // Use Pressable for overlay to dismiss
-            style={styles.settingsMenuOverlay}
-            onPress={toggleSettingsMenu}
-          >
-            <View style={[styles.settingsMenuContainer]}>
-              {/* Settings Item */}
-              <TouchableOpacity
-                style={styles.settingsMenuItem}
-                onPress={navigateToSettings}
-              >
-                <Feather
-                  name="settings"
-                  size={18}
-                  color={currentTheme.textSecondary}
-                  style={styles.settingsMenuIcon}
-                />
-                <Text
-                  style={[
-                    styles.settingsMenuItemText,
-                    { color: currentTheme.textPrimary },
-                  ]}
-                >
-                  Settings
-                </Text>
-              </TouchableOpacity>
-              {/* Add other menu items here if needed */}
-              {/* <View style={[styles.menuSeparator, {backgroundColor: currentTheme.inputBorder}]} />
-                         <TouchableOpacity style={styles.settingsMenuItem} onPress={() => { toggleSettingsMenu(); handleLogout(); }}>
-                             <Feather name="log-out" size={18} color={currentTheme.textSecondary} style={styles.settingsMenuIcon} />
-                             <Text style={[styles.settingsMenuItemText, { color: currentTheme.textPrimary }]}>Logout</Text>
-                         </TouchableOpacity> */}
-            </View>
+          <Pressable onPress={() => {}} // Prevent closing when tapping inside menu
+             style={[
+               styles.settingsMenuContainer,
+               {
+                 backgroundColor: cardBackgroundColor,
+                 borderColor: currentTheme.inputBorder || '#ddd',
+                 shadowColor: shadowColor
+               },
+             ]}
+           >
+             {/* Settings Item */}
+             <TouchableOpacity
+               style={styles.settingsMenuItem}
+               onPress={navigateToSettings}
+             >
+               <Feather
+                 name="settings"
+                 size={18}
+                 color={currentTheme.textSecondary}
+                 style={styles.settingsMenuIcon}
+               />
+               <Text
+                 style={[
+                   styles.settingsMenuItemText,
+                   { color: currentTheme.textPrimary },
+                 ]}
+               >
+                 Settings
+               </Text>
+             </TouchableOpacity>
+
+             {/* Add other menu items here if needed */}
+             {/* Example: Logout (ensure handleLogout is defined) */}
+             {/* <View style={[styles.menuSeparator, {backgroundColor: currentTheme.inputBorder}]} />
+                  <TouchableOpacity style={styles.settingsMenuItem} onPress={() => { toggleSettingsMenu(); handleLogout(); }}>
+                      <Feather name="log-out" size={18} color={currentTheme.error || 'red'} style={styles.settingsMenuIcon} />
+                      <Text style={[styles.settingsMenuItemText, { color: currentTheme.error || 'red' }]}>Logout</Text>
+                  </TouchableOpacity> */}
           </Pressable>
-        </Modal>
-      </SafeAreaView>
-    </LinearGradient>
+        </Pressable>
+      </Modal>
+    </SafeAreaView>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
   },
-  scrollView: {
-    flex: 1,
+  scrollContentContainer: {
+    alignItems: "center",
+    paddingHorizontal: 16, // Consistent horizontal padding
+    paddingTop: 10, // Adjust as needed
   },
-  scrollViewContent: {
-    paddingHorizontal: 20,
-    paddingTop: 60, // Increased padding to account for absolute positioned settings icon
-    paddingBottom: 30, // More padding at bottom
+  center: { // Loading indicator style
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
   },
   settingsIconContainer: {
-    position: "absolute",
-    top: 15, // Adjust based on status bar height/SafeAreaView padding
-    right: 15,
+    position: 'absolute', // Position top right
+    top: 10,
+    right: 16, // Match horizontal padding
     padding: 8,
-    zIndex: 10, // Ensure it's above ScrollView content
+    zIndex: 10, // Ensure it's above other elements if needed
   },
-  container: {
-    flex: 1,
-    paddingHorizontal: 20,
-    paddingBottom: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
+  profileHeader: {
     alignItems: "center",
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 30,
+    marginTop: 40, // Space below settings icon
+    marginBottom: 20,
+    width: '100%',
   },
   avatarContainer: {
-    position: "relative", // For positioning the edit icon
-    marginRight: 20,
+    marginBottom: 15,
+    // Add shadow to avatar container for depth
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 5,
+    borderRadius: 75, // Needs to match half of avatar size
   },
   avatar: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
+    width: 150, // Larger avatar
+    height: 150,
+    borderRadius: 75, // Half of width/height
     borderWidth: 3,
-    borderColor: "#ddd",
-  },
-  avatarEditIcon: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    padding: 5,
-    borderRadius: 12,
+    borderColor: "#fff", // White border looks clean
   },
   username: {
-    fontSize: 26,
+    fontSize: 26, // Larger username
     fontWeight: "bold",
-    marginLeft: 20,
-    flex: 1,
+    marginTop: 10,
+    textAlign: 'center',
   },
-  editButton: {
-    padding: 8,
-    marginLeft: 10,
-  },
-  editButtonContainer: {
-    backgroundColor: "#eee",
-    borderRadius: 15,
-    padding: 8,
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  infoSection: {
-    marginBottom: 20,
-    padding: 15,
-    borderRadius: 10,
-  },
-  sectionHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  sectionIcon: {
-    marginRight: 10,
-  },
-  sectionLabel: {
-    fontWeight: "bold",
-    fontSize: 18,
-  },
-  infoText: {
+  email: {
     fontSize: 16,
-  },
-  interestsContainer: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     marginTop: 5,
+    marginBottom: 15,
+    textAlign: 'center',
   },
-  interestChip: {
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    marginRight: 8,
-    marginBottom: 8,
-  },
-  interestChipText: {
-    fontSize: 14,
-  },
-  bioText: {
-    fontSize: 16,
-    lineHeight: 22,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.7)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    width: "90%",
-    height: "90%",
-    borderRadius: 15,
-    overflow: "hidden",
-  },
-  fullImage: {
-    width: "100%",
-    height: "100%",
-    resizeMode: "contain",
-  },
-  cardShadow: {
-    shadowColor: "#000",
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  actionButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingVertical: 12,
-    borderRadius: 10,
-    marginTop: 20,
-  },
-  actionIcon: {
-    marginRight: 10,
-  },
-  actionButtonText: {
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  // --- Settings Menu Modal Styles ---
-  settingsMenuOverlay: {
-    // Can reuse modalOverlay or make specific
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)", // Lighter overlay for menu
-  },
-  settingsMenuContainer: {
-    position: "absolute",
-    top: 55, // Position below the icon (adjust as needed)
-    right: 15, // Align with the icon
-    width: 180, // Adjust width as needed
-    borderRadius: 8,
-    borderWidth: 1,
-    // backgroundColor, borderColor dynamically set
-    elevation: 5,
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    paddingHorizontal: 25,
+    borderRadius: 25, // Rounded button
+    marginTop: 10,
+    // Shadow for button
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 3,
+    elevation: 3,
+  },
+  editProfileButtonText: {
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  statsContainer: {
+      flexDirection: 'row',
+      justifyContent: 'space-around',
+      width: '100%',
+      paddingVertical: 15, // Add vertical padding inside the card
+  },
+  statItem: {
+      alignItems: 'center',
+  },
+  statNumber: {
+      fontSize: 20,
+      fontWeight: 'bold',
+  },
+  statLabel: {
+      fontSize: 14,
+      marginTop: 4,
+  },
+  statSeparator: {
+      width: 1,
+      height: '60%', // Adjust height as needed
+      backgroundColor: '#e0e0e0', // Light separator color
+      alignSelf: 'center',
+  },
+  // Reusable Card Style
+  card: {
+    width: "100%",
+    borderRadius: 12,
+    padding: 18,
+    marginBottom: 16, // Space between cards
+    // Consistent shadow using theme color or fallback
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    marginBottom: 12, // Increased space below title
+    flexDirection: 'row', // Align icon and text
+    alignItems: 'center',
+  },
+  bioText: {
+    fontSize: 15,
+    lineHeight: 22, // Improve readability
+  },
+  horizontalScroll: {
+    // No specific styles needed here unless you want padding inside scroll
+    paddingBottom: 5, // Ensure chips don't get cut off
+  },
+  interestChip: {
+    paddingVertical: 8, // Slightly larger chips
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    marginRight: 10,
+    borderWidth: 1, // Subtle border
+    // Background and border colors set dynamically
+  },
+  interestChipText: {
+    fontSize: 14,
+    fontWeight: '500',
+  },
+   placeholderText: {
+    fontSize: 15,
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginTop: 10,
+  },
+  linkText: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginTop: 8, // Space above the link
+  },
+
+  // --- Modal Styles ---
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.85)", // Darker overlay for image modal
+    justifyContent: "center",
+    alignItems: "center",
+  },
+//   modalContent: { // Not strictly needed if image takes full space
+//     width: "90%",
+//     height: "80%", // Adjust size as needed
+//     borderRadius: 15,
+//     overflow: "hidden",
+//     alignItems: 'center',
+//     justifyContent: 'center'
+//   },
+  fullImage: {
+    width: '95%', // Leave some margin
+    height: '85%', // Adjust as needed
+    borderRadius: 5, // Optional: slight rounding
+  },
+ closeButton: {
+    position: 'absolute',
+    top: 50, // Adjust positioning as needed
+    right: 20,
+    padding: 10,
+    // backgroundColor: 'rgba(0,0,0,0.5)', // Optional background for visibility
+    borderRadius: 20,
+  },
+
+  // --- Settings Menu Modal Styles ---
+  settingsMenuOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0, 0, 0, 0.3)", // Semi-transparent overlay
+    // Align menu to top-right (adjust based on icon position)
+    // justifyContent: "flex-start",
+    // alignItems: "flex-end",
+     // We use absolute positioning for the container instead
+  },
+  settingsMenuContainer: {
+    position: "absolute",
+    top: 60, // Adjust based on SafeAreaView and icon position
+    right: 20,
+    width: 200, // Wider menu
+    borderRadius: 10, // More rounded corners
+    borderWidth: StyleSheet.hairlineWidth, // Thinner border
+    // Background and border color set dynamically
+    elevation: 8, // Slightly more elevation
+    // Shadow set dynamically
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    overflow: 'hidden', // Clip content to rounded corners
   },
   settingsMenuItem: {
     flexDirection: "row",
     alignItems: "center",
-    paddingVertical: 12,
-    paddingHorizontal: 15,
+    paddingVertical: 14, // More vertical padding
+    paddingHorizontal: 16,
   },
   settingsMenuIcon: {
-    marginRight: 15,
+    marginRight: 16, // More space next to icon
   },
   settingsMenuItemText: {
     fontSize: 16,
+    fontWeight: '500', // Slightly bolder text
   },
   menuSeparator: {
     height: StyleSheet.hairlineWidth,

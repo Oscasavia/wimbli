@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useCallback } from "react"; // Added useCallback
 import {
   View,
   Text,
@@ -6,12 +6,15 @@ import {
   StyleSheet,
   ActivityIndicator,
   Image,
-  Pressable,
+  Pressable, // Use Pressable for modals
   TouchableOpacity,
   RefreshControl,
   TextInput,
   Modal,
+  Alert,
   ScrollView,
+  Dimensions, // Import Dimensions
+  Platform, // Import Platform for specific styles/behavior
 } from "react-native";
 import {
   collection,
@@ -22,6 +25,10 @@ import {
   getDocs,
   addDoc,
   serverTimestamp,
+  updateDoc,
+  arrayUnion,
+  getDoc,
+  Timestamp, // Import Timestamp
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigation } from "@react-navigation/native";
@@ -29,795 +36,703 @@ import { Picker } from "@react-native-picker/picker";
 import { onAuthStateChanged } from "firebase/auth";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
-import { Feather } from "@expo/vector-icons"; // For icons
+import { Feather } from "@expo/vector-icons"; // Use Feather exclusively
 import { SafeAreaView } from "react-native-safe-area-context";
-import { updateDoc, arrayUnion, getDoc } from "firebase/firestore";
-import { LinearGradient } from "expo-linear-gradient";
-import { FontAwesome } from "@expo/vector-icons";
-import { Animated, Dimensions, PanResponder } from "react-native";
+// Removed LinearGradient, FontAwesome, Animated, PanResponder
 
+// Updated Post type
 type Post = {
   id: string;
   title: string;
   description: string;
   category: string;
   location: string;
-  date: string;
+  date: Timestamp | string; // Handle both Timestamp and potential string dates
   fee: number;
   createdBy: string;
-  creatorName?: string;
-  creatorAvatar?: string;
+  creatorUsername?: string; // Renamed for clarity, matches PostScreen
+  creatorProfilePic?: string; // Renamed for clarity, matches PostScreen
+  // Add other fields if they exist
 };
+
+// Define INTEREST_OPTIONS if used in filters (assuming it's the same list)
+const INTEREST_OPTIONS = [
+    "Poetry", "Tennis", "Coding", "Volunteering", "Live Music", "Book Clubs",
+    "Photography", "Dancing", "Spirituality", "Outdoor Events", "Art", "Sports",
+    "Games", "Electronics", "Automotive", "Garden", "Academics", "Medical",
+    "Beauty", "Pet", "Food", "Clothes",
+];
+
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [interests, setInterests] = useState<string[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>("All");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
-  const [savedPosts, setSavedPosts] = useState<string[]>([]);
+  const [userInterests, setUserInterests] = useState<string[]>([]); // User's saved interests
+  const [selectedCategory, setSelectedCategory] = useState<string>("All"); // Filter state
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // Default to newest first
+  const [savedPosts, setSavedPosts] = useState<string[]>([]); // Local state for saved post IDs (Needs Persistence)
   const [searchText, setSearchText] = useState("");
-  const [modalVisible, setModalVisible] = useState(false);
+  const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [distanceRadius, setDistanceRadius] = useState<
-    "All" | "1km" | "5km" | "10km"
-  >("All");
-  const [selectedFee, setSelectedFee] = useState<"All" | "Free" | "Paid">(
-    "All"
-  );
+  const [distanceRadius, setDistanceRadius] = useState<"All" | "1km" | "5km" | "10km">("All"); // Filter state (logic not implemented)
+  const [selectedFee, setSelectedFee] = useState<"All" | "Free" | "Paid">("All"); // Filter state
+  const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
+
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
-  const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
-  const [creatorName, setCreatorName] = useState("");
-  const [creatorAvatar, setCreatorAvatar] = useState("");
 
+  // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const cardBorderColor = currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
+  const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
+  const shadowColor = currentTheme.shadowColor || "#000";
+  const savedIconColor = currentTheme.primary || 'blue'; // Color for saved bookmark
+
+  // Effect to fetch user interests and posts
   useEffect(() => {
+    let unsubscribeUser: (() => void) | null = null;
+    let unsubscribePosts: (() => void) | null = null;
+    console.log("HomeScreen useEffect triggered."); // Log effect trigger
+
     const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      if (user) {
-        const userId = user.uid;
+      console.log("Auth state changed. User:", user ? user.uid : null);
 
-        const unsubscribeUser = onSnapshot(
-          doc(db, "users", userId),
-          (userDoc) => {
-            const selectedInterests = userDoc.data()?.interests || [];
-            setInterests(selectedInterests);
-          }
-        );
-
-        const postsQuery = query(collection(db, "posts"));
-
-        const unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
-          let postPromises = postsSnap.docs.map(async (docSnap) => {
-            const data = docSnap.data();
-            const postId = docSnap.id;
-
-            const matchInterest =
-              interests.length === 0 || interests.includes(data.category);
-            const matchCategory =
-              selectedCategory === "All" || data.category === selectedCategory;
-            const searchTextLower = searchText.toLowerCase();
-            const matchSearch =
-              !searchText ||
-              data.title.toLowerCase().includes(searchTextLower) ||
-              data.description.toLowerCase().includes(searchTextLower);
-
-            let matchFee = true;
-            if (selectedFee === "Free") {
-              matchFee = data.fee === 0;
-            } else if (selectedFee === "Paid") {
-              matchFee = data.fee > 0;
-            }
-
-            const matchDistance = distanceRadius === "All";
-
-            if (
-              matchInterest &&
-              matchCategory &&
-              matchSearch &&
-              matchDistance &&
-              matchFee
-            ) {
-              let creatorName = "Unknown";
-              let creatorAvatar = "";
-
-              try {
-                if (data.createdBy) {
-                  const userDoc = await getDoc(
-                    doc(db, "users", data.createdBy)
-                  );
-                  if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    creatorName = userData.username || "Unknown";
-                    creatorAvatar = userData.profilePicture || "";
-                  }
-                }
-              } catch (error) {
-                console.error("Failed to fetch creator info", error);
-              }
-
-              return {
-                id: postId,
-                ...data,
-                createdBy: data.createdBy,
-                creatorName,
-                creatorAvatar,
-              } as Post;
-            }
-            return null;
-          });
-
-          const allPosts = await Promise.all(postPromises);
-          const validPosts = allPosts.filter((post) => post !== null) as Post[];
-
-          const sorted = validPosts.sort((a, b) => {
-            const diff =
-              new Date(a.date).getTime() - new Date(b.date).getTime();
-            return sortOrder === "asc" ? diff : -diff;
-          });
-
-          setPosts(sorted);
-          setLoading(false);
-          setRefreshing(false);
-        });
-
-        return () => {
-          unsubscribeUser();
-          unsubscribePosts();
-        };
+      // --- Cleanup listeners from previous auth state ---
+      // It's crucial to clean up listeners if the user logs out or changes
+      if (unsubscribeUser) {
+        console.log("Cleaning up previous user listener.");
+        unsubscribeUser();
+        unsubscribeUser = null;
       }
-    });
+      if (unsubscribePosts) {
+        console.log("Cleaning up previous posts listener.");
+        unsubscribePosts();
+        unsubscribePosts = null;
+      }
 
-    return () => unsubscribeAuth();
-  }, [
-    selectedCategory,
-    sortOrder,
-    searchText,
-    interests,
-    distanceRadius,
-    selectedFee,
-  ]);
+      // --- Handle User Logout: Reset state here ONLY ---
+      if (!user) {
+        console.log("User logged out. Resetting state.");
+        setPosts([]);
+        setUserInterests([]); // Reset interests state on logout
+        setSavedPosts([]);   // Reset saved posts state on logout
+        setLoading(false);   // Stop loading if no user
+        return; // Stop further setup for this auth state change
+      }
 
-  const onRefresh = () => {
+      // --- User is Logged In ---
+      const userId = user.uid;
+      // Set loading true when we are about to set up listeners for a logged-in user
+      // Only set if not already loading maybe? Or manage carefully. Let's keep it simple for now.
+      setLoading(true);
+      console.log(`User ${userId} logged in. Setting up listeners...`);
+
+      // --- Listener for User Interests (No reset here) ---
+      const userDocRef = doc(db, "users", userId);
+      unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
+        const interestsData = userDoc.data()?.interests || [];
+        // Use the robust comparison logic from previous step
+        setUserInterests((prevInterests) => {
+            // console.log('--- Comparing Interests ---'); // Keep logs if needed
+            // console.log('Previous:', JSON.stringify(prevInterests));
+            // console.log('Fetched: ', JSON.stringify(interestsData));
+            if (!interestsAreEqual(prevInterests, interestsData)) {
+                console.log("User interests ARE different, updating state.");
+                return interestsData;
+            } else {
+                // console.log("User interests are SAME, returning prev ref.");
+                return prevInterests; // Return same reference if no change
+            }
+        });
+        // Fetch persisted saved posts state here if implemented
+      }, (error) => {
+        console.error("Error fetching user data:", error);
+        setLoading(false); // Stop loading on user fetch error
+      });
+
+      // --- Listener for Posts (No reset here) ---
+      const postsQuery = query(collection(db, "posts"));
+      unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
+         console.log(`Posts snapshot received. Size: ${postsSnap.size}`);
+         // ... (Keep your existing posts processing logic here: map, filter, fetch creator, sort) ...
+
+         // --- Start of example post processing logic ---
+         if (postsSnap.empty) {
+             setPosts([]);
+             setLoading(false);
+             setRefreshing(false);
+             console.log("Posts empty, loading false.");
+             return;
+         }
+         let postPromises = postsSnap.docs.map(async (docSnap) => {
+             const data = docSnap.data();
+             const postId = docSnap.id;
+             const matchInterest = userInterests.length === 0 || (data.category && userInterests.includes(data.category));
+             const matchCategory = selectedCategory === "All" || data.category === selectedCategory;
+             const searchTextLower = searchText.toLowerCase();
+             const matchSearch = !searchText ||
+                                 (data.title && data.title.toLowerCase().includes(searchTextLower)) ||
+                                 (data.description && data.description.toLowerCase().includes(searchTextLower));
+             let matchFee = true;
+             if (selectedFee === "Free") matchFee = data.fee === 0;
+             else if (selectedFee === "Paid") matchFee = data.fee > 0;
+             const matchDistance = distanceRadius === "All";
+
+             if (matchInterest && matchCategory && matchSearch && matchDistance && matchFee) {
+                 let creatorUsername = data.creatorUsername || "Unknown";
+                 let creatorProfilePic = data.creatorProfilePic || "";
+                 if ((!creatorUsername || creatorUsername === "Unknown") && data.createdBy) {
+                     try {
+                         const userDoc = await getDoc(doc(db, "users", data.createdBy));
+                         if (userDoc.exists()) {
+                             const userData = userDoc.data();
+                             creatorUsername = userData.username || "Unknown";
+                             creatorProfilePic = userData.profilePicture || "";
+                         }
+                     } catch (error) { console.error("Failed creator fetch", error); }
+                 }
+                 let postDate : Timestamp | string = data.date || Timestamp.now();
+                 if (data.date && typeof data.date.toDate === 'function') { postDate = data.date;}
+                 else if (data.date && typeof data.date === 'string') { postDate = data.date; }
+
+                 return {
+                     id: postId,
+                     title: data.title || 'No Title', description: data.description || '',
+                     category: data.category || 'Uncategorized', location: data.location || 'No Location',
+                     date: postDate, fee: data.fee ?? 0, createdBy: data.createdBy || '',
+                     creatorUsername, creatorProfilePic,
+                 } as Post;
+             }
+             return null;
+         });
+
+         try {
+             const allPosts = await Promise.all(postPromises);
+             const validPosts = allPosts.filter(p => p !== null) as Post[];
+             const sorted = [...validPosts].sort((a, b) => {
+                 const timeA = a.date instanceof Timestamp ? a.date.toMillis() : new Date(a.date).getTime();
+                 const timeB = b.date instanceof Timestamp ? b.date.toMillis() : new Date(b.date).getTime();
+                 const validTimeA = isNaN(timeA) ? (sortOrder === 'asc' ? Infinity : -Infinity) : timeA;
+                 const validTimeB = isNaN(timeB) ? (sortOrder === 'asc' ? Infinity : -Infinity) : timeB;
+                 const diff = validTimeA - validTimeB;
+                 return sortOrder === "asc" ? diff : -diff;
+             });
+
+             setPosts(sorted);
+             setLoading(false); // CRITICAL: Set loading false *after* successful processing
+             setRefreshing(false);
+             console.log("Posts processed, loading false.");
+         } catch (error) {
+             console.error("Error processing posts:", error);
+             setLoading(false); // Ensure loading is false on error
+             setRefreshing(false);
+         }
+         // --- End of example post processing logic ---
+
+      }, (error) => {
+        console.error("Error fetching posts:", error);
+        Alert.alert("Error", "Could not load posts.");
+        setLoading(false); // Ensure loading is false on listener error
+        setRefreshing(false);
+      });
+
+    }); // End of onAuthStateChanged
+
+    // Cleanup function for the useEffect hook itself
+    return () => {
+      console.log("HomeScreen useEffect cleanup.");
+      unsubscribeAuth(); // Unsubscribe auth listener
+      if (unsubscribeUser) {
+         console.log("Cleaning up user listener on unmount/re-run.");
+         unsubscribeUser(); // Ensure cleanup on unmount/re-run
+      }
+      if (unsubscribePosts) {
+         console.log("Cleaning up posts listener on unmount/re-run.");
+         unsubscribePosts(); // Ensure cleanup on unmount/re-run
+      }
+    };
+  // Use the original dependencies array
+  }, [selectedCategory, sortOrder, searchText, userInterests, distanceRadius, selectedFee]);
+
+
+  // --- Actions ---
+  const onRefresh = useCallback(() => {
     setRefreshing(true);
-    setTimeout(() => setRefreshing(false), 500);
-  };
+    // Data refreshes via onSnapshot, but we simulate a delay for visual feedback
+    // In a real scenario with manual fetch, you'd re-trigger the fetch here.
+    setTimeout(() => setRefreshing(false), 600);
+  }, []);
 
-  const openModal = async (post: Post) => {
+  const openDetailsModal = (post: Post) => {
     setSelectedPost(post);
+    setIsDetailsModalVisible(true);
+  };
 
-    // if (post.creatorName) {
-    //     const userDoc = await getDoc(doc(db, 'users', post.creatorName));
-    //     if (userDoc.exists()) {
-    //         const userData = userDoc.data();
-    //         setCreatorName(userData.username || 'Unknown');
-    //         setCreatorAvatar(userData.profilePicture || '');
-    //     }
+  const closeDetailsModal = () => {
+    setIsDetailsModalVisible(false);
+    setSelectedPost(null); // Clear selected post
+  };
+
+  const openFilterDrawer = () => {
+    setIsFilterDrawerVisible(true);
+  };
+
+  const closeFilterDrawer = () => {
+    setIsFilterDrawerVisible(false);
+  };
+
+  const interestsAreEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
+    if (!arr1 || !arr2) return arr1 === arr2; // Handle null/undefined cases
+    if (arr1.length !== arr2.length) return false;
+    // Create sorted copies for comparison to handle order differences
+    const sorted1 = [...arr1].sort();
+    const sorted2 = [...arr2].sort();
+    // Check if every element matches at the same sorted position
+    return sorted1.every((value, index) => value === sorted2[index]);
+  };
+
+  const handleToggleSave = async (postId: string) => {
+    // NOTE: This updates local state only. For persistence:
+    // 1. Fetch current saved posts from Firestore user doc.
+    // 2. Update the array (add or remove postId).
+    // 3. Update the user doc in Firestore.
+    const isCurrentlySaved = savedPosts.includes(postId);
+    const newSavedPosts = isCurrentlySaved
+        ? savedPosts.filter((id) => id !== postId)
+        : [...savedPosts, postId];
+    setSavedPosts(newSavedPosts);
+
+    // --- Example Firestore Update (Uncomment and adapt if needed) ---
+    // const currentUser = auth.currentUser;
+    // if (currentUser) {
+    //   const userDocRef = doc(db, "users", currentUser.uid);
+    //   try {
+    //     await updateDoc(userDocRef, {
+    //       savedPosts: newSavedPosts // Or use arrayUnion/arrayRemove
+    //     });
+    //     console.log("Saved posts updated in Firestore.");
+    //   } catch (error) {
+    //     console.error("Error updating saved posts in Firestore:", error);
+    //     // Revert local state change on error
+    //     setSavedPosts(savedPosts);
+    //     Alert.alert("Error", "Could not update saved posts.");
+    //   }
     // }
-    setModalVisible(true);
+    // --- End Example Firestore Update ---
   };
 
-  const handleToggleSave = (postId: string) => {
-    setSavedPosts(
-      (prev) =>
-        prev.includes(postId)
-          ? prev.filter((id) => id !== postId) // unsave
-          : [...prev, postId] // save
-    );
-  };
 
   const handleJoinChat = async (post: Post | null) => {
     if (!post || !auth.currentUser) return;
 
     const userId = auth.currentUser.uid;
-    const groupTitle = post.title;
+    const groupTitle = post.title; // Use post title as group identifier
 
-    const groupRef = collection(db, "groups");
-    const q = query(groupRef, where("title", "==", groupTitle));
-    const querySnapshot = await getDocs(q);
+    // Check if a group based on this post already exists
+    // Using post.id might be a more unique identifier than title if titles can clash
+    // const groupId = post.id; // Example: using post ID as group ID
+    // const groupDocRef = doc(db, "groups", groupId);
 
-    let groupId = "";
+    // Or query by title as before:
+    const groupsRef = collection(db, "groups");
+    const q = query(groupsRef, where("title", "==", groupTitle), where("postId", "==", post.id)); // Query by title AND postId for uniqueness
 
-    if (querySnapshot.empty) {
-      // Create new group with user as first member
-      const docRef = await addDoc(groupRef, {
-        title: groupTitle,
-        createdAt: serverTimestamp(),
-        members: [userId], // ✅ members array is created here
-      });
-      groupId = docRef.id;
-    } else {
-      const groupDoc = querySnapshot.docs[0];
-      groupId = groupDoc.id;
+    setIsDetailsModalVisible(false); // Close modal before navigating
 
-      // ✅ Instead of adding to a subcollection, update the main group doc's members array
-      const groupRef = doc(db, "groups", groupId);
-      await updateDoc(groupRef, {
-        members: arrayUnion(userId),
-      });
+    try {
+        const querySnapshot = await getDocs(q);
+        let groupId = "";
+        let groupDocRef;
+
+        if (querySnapshot.empty) {
+          // Create new group if it doesn't exist
+          console.log(`Creating new chat group for post: ${post.title}`);
+          const newGroupRef = await addDoc(groupsRef, {
+            postId: post.id, // Link group to the post
+            title: groupTitle,
+            createdAt: serverTimestamp(),
+            members: [userId], // Add current user as the first member
+            createdBy: post.createdBy, // Store post creator
+          });
+          groupId = newGroupRef.id;
+        } else {
+          // Group exists, join it by adding user to members array
+          const groupDoc = querySnapshot.docs[0];
+          groupId = groupDoc.id;
+          groupDocRef = doc(db, "groups", groupId);
+          console.log(`Joining existing chat group: ${groupId}`);
+          await updateDoc(groupDocRef, {
+            members: arrayUnion(userId), // Add user if not already present
+          });
+        }
+
+        // Navigate to the Chat screen
+        navigation.navigate("Chat", { // Ensure "Chat" is the correct route name
+          groupId,
+          groupName: post.title,
+        });
+
+    } catch (error) {
+         console.error("Error joining or creating chat:", error);
+         Alert.alert("Error", "Could not join the chat for this event.");
+         setIsDetailsModalVisible(true); // Re-open modal on error if desired
     }
-
-    // Navigate to Messages screen with this group
-    navigation.navigate("Chat", {
-      groupId,
-      groupName: post.title, // important for displaying in header
-    });
-    closeModal();
   };
 
-  const closeModal = () => {
-    setModalVisible(false);
-    setSelectedPost(null);
-  };
+  // --- Render Functions ---
 
-  if (!auth.currentUser?.uid) {
+  const renderPostCard = ({ item }: { item: Post }) => {
+    // Safely parse date for display within the card
+    let displayDate = "Date unavailable";
+    try {
+        const dateObj = item.date instanceof Timestamp ? item.date.toDate() : new Date(item.date);
+        if (!isNaN(dateObj.getTime())) {
+           displayDate = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }); // Shorter date format for card
+        }
+    } catch (e) { console.error("Date parsing error in renderPostCard:", e); }
+
+    const isSaved = savedPosts.includes(item.id);
+
     return (
-      <View
-        style={[styles.center, { backgroundColor: currentTheme.background }]}
-      >
-        <ActivityIndicator size="large" color={currentTheme.primary} />
-        <Text style={{ color: currentTheme.textSecondary }}>
-          Checking user account...
-        </Text>
-      </View>
+      <TouchableOpacity activeOpacity={0.8} onPress={() => openDetailsModal(item)}>
+        <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
+          {/* Top Row: Creator Info + Bookmark */}
+          <View style={styles.cardTopRow}>
+              <TouchableOpacity
+                  style={styles.creatorInfoSmall}
+                  onPress={(e) => {
+                      e.stopPropagation(); // Prevent card press when tapping creator
+                      navigation.navigate("Profile", { userId: item.createdBy });
+                  }}
+              >
+                  <Image
+                      source={item.creatorProfilePic ? { uri: item.creatorProfilePic } : require("../assets/default-profile.png")}
+                      style={styles.creatorAvatarSmall}
+                  />
+                  <Text style={[styles.creatorNameSmall, { color: currentTheme.textSecondary }]} numberOfLines={1}>
+                      {item.creatorUsername || 'Unknown'}
+                  </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                  onPress={(e) => {
+                      e.stopPropagation(); // Prevent card press when tapping bookmark
+                      handleToggleSave(item.id);
+                  }}
+                  style={styles.saveIconButton}
+              >
+                  <Feather
+                      name="bookmark"
+                      size={22}
+                      color={isSaved ? savedIconColor : currentTheme.textSecondary}
+                      fill={isSaved ? savedIconColor : 'none'} // Fill icon when saved
+                  />
+              </TouchableOpacity>
+          </View>
+
+          {/* Main Content */}
+          <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]} numberOfLines={2}>
+            {item.title}
+          </Text>
+          <Text style={[styles.cardDescShort, { color: currentTheme.textSecondary }]} numberOfLines={3}>
+            {item.description}
+          </Text>
+
+          {/* Bottom Row: Date, Category, Fee */}
+           <View style={[styles.cardBottomRow, { borderTopColor: cardBorderColor }]}>
+              <View style={styles.cardInfoItem}>
+                 <Feather name="calendar" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]}>{displayDate}</Text>
+              </View>
+              <View style={styles.cardInfoItem}>
+                 <Feather name="tag" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]} numberOfLines={1}>{item.category}</Text>
+              </View>
+              <View style={styles.cardInfoItem}>
+                 <Feather name="dollar-sign" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
+                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary, fontWeight: '600' }]}>
+                    {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+                 </Text>
+              </View>
+           </View>
+        </View>
+      </TouchableOpacity>
     );
-  }
+  };
+
+
+  // --- Initial Loading / Auth Check ---
+  // Moved auth check logic inside useEffect, handle loading state directly
+  // This prevents rendering the main UI before auth state is known.
 
   return (
-    <LinearGradient
-      colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
-      style={{ flex: 1 }}
-    >
-      <SafeAreaView style={[styles.container, { flex: 1 }]}>
-        {/* Search Bar */}
-        <View style={styles.headerContainer}>
-          <View style={styles.searchContainer}>
-            <Feather
-              name="search"
-              size={20}
-              color={currentTheme.textSecondary}
-              style={styles.searchIcon}
-            />
-            <TextInput
-              style={[
-                styles.searchInput,
-                {
-                  borderColor: currentTheme.inputBorder,
-                  color: currentTheme.textPrimary,
-                },
-              ]} // Added color
-              placeholder="Search events..."
-              placeholderTextColor={currentTheme.textSecondary} // Use theme color for placeholder
-              value={searchText}
-              onChangeText={setSearchText}
-            />
-          </View>
-          <TouchableOpacity
-            style={styles.filterTriggerButton}
-            onPress={() => setIsFilterDrawerVisible(true)} // Open the drawer
-          >
-            <Feather name="sliders" size={24} color={currentTheme.primary} />
-          </TouchableOpacity>
-        </View>
-
-        {loading ? (
-          <View style={styles.center}>
-            <ActivityIndicator size="large" color={currentTheme.primary} />
-            <Text style={{ color: currentTheme.textSecondary }}>
-              Loading timeline...
-            </Text>
-          </View>
-        ) : posts.length === 0 ? (
-          <View style={styles.center}>
-            <Text style={{ color: currentTheme.textSecondary }}>
-              No nearby events match your interests... yet 🎯
-            </Text>
-          </View>
-        ) : (
-          <FlatList
-            data={posts}
-            keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
-            refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            renderItem={({ item }) => (
-              <TouchableOpacity onPress={() => openModal(item)}>
-                <View
-                  style={[
-                    styles.card,
-                    {
-                      backgroundColor: currentTheme.inputBackground,
-                      borderColor: currentTheme.inputBorder,
-                    },
-                    styles.cardShadow,
-                  ]}
-                >
-                  <View style={styles.cardHeader}>
-                    <Text
-                      style={[
-                        styles.cardTitle,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                    >
-                      {item.title}
-                    </Text>
-
-                    <TouchableOpacity
-                      onPress={() => handleToggleSave(item.id)}
-                      style={styles.saveIconButton}
-                    >
-                      <Feather
-                        name="bookmark"
-                        size={22}
-                        color={
-                          savedPosts.includes(item.id)
-                            ? "red"
-                            : currentTheme.textSecondary
-                        }
-                      />
-                    </TouchableOpacity>
-                  </View>
-
-                  <View style={{ flexDirection: "row" }}>
-                    <FontAwesome
-                      name="calendar"
-                      flex="1"
-                      size={14}
-                      color="#00ACC1"
-                      style={{ marginRight: 6 }}
-                    />
-                    <Text
-                      style={[
-                        styles.cardDateTime,
-                        { color: currentTheme.textSecondary, flex: 1 },
-                      ]}
-                    >
-                      {new Date(item.date).toLocaleString([], {
-                        dateStyle: "medium",
-                        timeStyle: "short",
-                      })}
-                    </Text>
-                  </View>
-                  <Text
-                    style={[
-                      styles.cardDescShort,
-                      { color: currentTheme.textPrimary },
-                    ]}
-                  >
-                    {item.description.length > 100
-                      ? `${item.description.substring(0, 100)}...`
-                      : item.description}
-                  </Text>
-
-                  <Text
-                    style={{ color: currentTheme.textSecondary, fontSize: 13 }}
-                  >
-                    {item.creatorName
-                      ? `Created by: ${item.creatorName}`
-                      : "Created by: Unknown"}
-                  </Text>
-                  <View style={styles.separator} />
-                  <View style={styles.cardBottom}>
-                    <Text
-                      style={[
-                        styles.cardCategory,
-                        { color: currentTheme.textSecondary },
-                      ]}
-                    >
-                      {item.category}
-                    </Text>
-                    <Text
-                      style={[
-                        styles.cardFee,
-                        { color: currentTheme.textSecondary },
-                      ]}
-                    >
-                      {item.fee === 0 ? "Free" : `$${item.fee}`}
-                    </Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            )}
+    <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+      {/* Header: Search + Filter Button */}
+      <View style={styles.headerContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+          <Feather name="search" size={20} color={placeholderTextColor} style={styles.searchIcon} />
+          <TextInput
+            style={[styles.searchInput, { color: currentTheme.textPrimary }]}
+            placeholder="Search events..."
+            placeholderTextColor={placeholderTextColor}
+            value={searchText}
+            onChangeText={setSearchText}
+            returnKeyType="search"
           />
-        )}
+           {searchText.length > 0 && ( // Show clear button only when there is text
+                <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearSearchButton}>
+                    <Feather name="x-circle" size={18} color={placeholderTextColor} />
+                </TouchableOpacity>
+            )}
+        </View>
+        <TouchableOpacity style={styles.filterTriggerButton} onPress={openFilterDrawer}>
+          <Feather name="sliders" size={24} color={currentTheme.primary} />
+        </TouchableOpacity>
+      </View>
 
-        {/* Modal for Post Details */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={modalVisible}
-          onRequestClose={closeModal}
+      {/* Main Content: List or Loading/Empty State */}
+      {loading ? (
+        <View style={styles.centerStatusContainer}>
+          <ActivityIndicator size="large" color={currentTheme.primary} />
+          <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
+            Loading events...
+          </Text>
+        </View>
+      ) : posts.length === 0 ? (
+        <ScrollView
+            contentContainerStyle={styles.centerStatusContainer}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentTheme.primary]} tintColor={currentTheme.primary}/>}
         >
-          <Pressable style={styles.detailsModalOverlay} onPress={closeModal}>
-            <Pressable style={[styles.detailsModalContent]}>
-              <LinearGradient
-                colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
-                start={{ x: 0, y: 0 }}
-                end={{ x: 1, y: 1 }}
-              >
-                {selectedPost && (
-                  <>
-                    <ScrollView
-                      showsVerticalScrollIndicator={false}
-                      contentContainerStyle={styles.detailsScrollContainer}
-                    >
-                      <TouchableOpacity
+          <Feather name="calendar" size={50} color={currentTheme.textSecondary} />
+          <Text style={[styles.statusTitle, { color: currentTheme.textPrimary }]}>No Events Found</Text>
+          <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
+            No events match your current filters or interests. Try adjusting the filters!
+          </Text>
+        </ScrollView>
+      ) : (
+        <FlatList
+          data={posts}
+          renderItem={renderPostCard}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContainer}
+          showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl
+                refreshing={refreshing}
+                onRefresh={onRefresh}
+                colors={[currentTheme.primary]} // Android primary color
+                tintColor={currentTheme.primary} // iOS primary color
+            />
+          }
+        />
+      )}
+
+      {/* --- Modals --- */}
+
+      {/* Post Details Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isDetailsModalVisible}
+        onRequestClose={closeDetailsModal}
+      >
+        <Pressable style={styles.detailsModalOverlay} onPress={closeDetailsModal}>
+           {/* Use Pressable for content to stop overlay press propagation */}
+          <Pressable style={[styles.detailsModalContent, { backgroundColor: currentTheme.cardBackground }]}>
+            {selectedPost && (
+              <>
+                <ScrollView
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.detailsScrollContainer}
+                >
+                    {/* Creator Info Header */}
+                    <TouchableOpacity
                         style={styles.creatorInfoContainer}
                         onPress={() => {
-                          closeModal(); // Close this modal first
-                          if (selectedPost?.createdBy) {
-                            navigation.navigate("Profile", {
-                              userId: selectedPost.createdBy,
-                            });
-                          } else {
-                            console.warn("Missing creator UID");
-                          }
+                            closeDetailsModal();
+                            if (selectedPost?.createdBy) {
+                                navigation.navigate("Profile", { userId: selectedPost.createdBy });
+                            }
                         }}
-                      >
-                        {selectedPost?.creatorAvatar ? (
-                          <Image
-                            source={{ uri: selectedPost.creatorAvatar }}
-                            style={styles.creatorAvatar}
-                          />
-                        ) : (
-                          <Image
-                            source={require("../assets/default-profile.png")}
-                            style={styles.creatorAvatar}
-                          />
-                        )}
-                        <Text
-                          style={[
-                            styles.creatorNameText,
-                            { color: currentTheme.primary },
-                          ]}
-                        >
-                          {selectedPost?.creatorName || "Unknown User"}
+                    >
+                        <Image
+                            source={selectedPost.creatorProfilePic ? { uri: selectedPost.creatorProfilePic } : require("../assets/default-profile.png")}
+                            style={[styles.creatorAvatar, {borderColor: currentTheme.background}]}
+                        />
+                        <Text style={[styles.creatorNameText, { color: currentTheme.textPrimary }]} numberOfLines={1}>
+                            {selectedPost.creatorUsername || "Unknown User"}
                         </Text>
-                      </TouchableOpacity>
+                    </TouchableOpacity>
 
-                      <Text
-                        style={[
-                          styles.detailsModalTitle,
-                          { color: currentTheme.textPrimary },
-                        ]}
-                      >
+                    {/* Post Title */}
+                    <Text style={[styles.detailsModalTitle, { color: currentTheme.textPrimary }]}>
                         {selectedPost.title}
-                      </Text>
+                    </Text>
 
-                      <View style={styles.detailsSection}>
+                    {/* Details Section (Date, Location, Category, Fee) */}
+                    <View style={styles.detailsSection}>
                         <View style={styles.detailRow}>
-                          <Feather
-                            name="calendar"
-                            size={18}
-                            color={currentTheme.textSecondary}
-                            style={styles.detailIcon}
-                          />
-                          <Text
-                            style={[
-                              styles.detailText,
-                              { color: currentTheme.textSecondary },
-                            ]}
-                          >
-                            {new Date(selectedPost.date).toLocaleString([], {
-                              dateStyle: "medium",
-                              timeStyle: "short",
-                            })}
-                          </Text>
+                            <Feather name="calendar" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
+                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
+                                {selectedPost.date instanceof Timestamp
+                                 ? selectedPost.date.toDate().toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })
+                                 : new Date(selectedPost.date).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })
+                                }
+                            </Text>
                         </View>
-                        <View style={styles.detailRow}>
-                          <Feather
-                            name="map-pin"
-                            size={18}
-                            color={currentTheme.textSecondary}
-                            style={styles.detailIcon}
-                          />
-                          <Text
-                            style={[
-                              styles.detailText,
-                              { color: currentTheme.textSecondary },
-                            ]}
-                          >
-                            {selectedPost.location}
-                          </Text>
+                         <View style={styles.detailRow}>
+                            <Feather name="map-pin" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
+                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
+                                {selectedPost.location}
+                            </Text>
                         </View>
-                        <View style={styles.detailRow}>
-                          <Feather
-                            name="tag"
-                            size={18}
-                            color={currentTheme.textSecondary}
-                            style={styles.detailIcon}
-                          />
-                          <Text
-                            style={[
-                              styles.detailText,
-                              { color: currentTheme.textSecondary },
-                            ]}
-                          >
-                            {selectedPost.category}
-                          </Text>
+                         <View style={styles.detailRow}>
+                            <Feather name="tag" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
+                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
+                                {selectedPost.category}
+                            </Text>
                         </View>
-                        <View style={styles.detailRow}>
-                          <Feather
-                            name="dollar-sign"
-                            size={18}
-                            color={currentTheme.textSecondary}
-                            style={styles.detailIcon}
-                          />
-                          <Text
-                            style={[
-                              styles.detailText,
-                              styles.detailFee,
-                              {
-                                color:
-                                  selectedPost.fee === 0
-                                    ? currentTheme.primary
-                                    : currentTheme.textSecondary,
-                              },
-                            ]}
-                          >
-                            {selectedPost.fee === 0
-                              ? "Free"
-                              : `$${selectedPost.fee}`}
-                          </Text>
+                         <View style={styles.detailRow}>
+                            <Feather name="dollar-sign" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
+                            <Text style={[styles.detailText, styles.detailFee, { color: selectedPost.fee === 0 ? currentTheme.primary : currentTheme.textPrimary }]}>
+                                {selectedPost.fee === 0 ? "Free Event" : `$${selectedPost.fee.toFixed(2)}`}
+                            </Text>
                         </View>
-                      </View>
-
-                      <View
-                        style={[
-                          styles.detailsSeparator,
-                          { borderBottomColor: currentTheme.inputBorder },
-                        ]}
-                      />
-
-                      <Text
-                        style={[
-                          styles.descriptionTitle,
-                          { color: currentTheme.textPrimary },
-                        ]}
-                      >
-                        About this event
-                      </Text>
-                      <Text
-                        style={[
-                          styles.detailsModalDesc,
-                          { color: currentTheme.textPrimary },
-                        ]}
-                      >
-                        {selectedPost.description}
-                      </Text>
-                    </ScrollView>
-
-                    <View style={styles.buttonContainer}>
-                      <TouchableOpacity
-                        style={[styles.actionButton, styles.joinButton]} // Specific style for Join
-                        onPress={() => handleJoinChat(selectedPost)}
-                      >
-                        <Feather
-                          name="message-circle"
-                          size={18}
-                          color="#fff"
-                          style={styles.buttonIcon}
-                        />
-                        <Text
-                          style={[
-                            styles.actionButtonText,
-                            styles.joinButtonText,
-                          ]}
-                        >
-                          Join Chat
-                        </Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={[
-                          styles.actionButton,
-                          styles.closeButtonAlt,
-                          { backgroundColor: currentTheme.inputBackground },
-                        ]} // Specific style for Close
-                        onPress={closeModal}
-                      >
-                        <Text
-                          style={[
-                            styles.actionButtonText,
-                            { color: currentTheme.textSecondary },
-                          ]}
-                        >
-                          Close
-                        </Text>
-                      </TouchableOpacity>
                     </View>
-                  </>
-                )}
-                <TouchableOpacity
-                  style={styles.modalCloseIcon}
-                  onPress={closeModal}
-                >
-                  <Feather
-                    name="x"
-                    size={24}
-                    color={currentTheme.textSecondary}
-                  />
-                </TouchableOpacity>
-              </LinearGradient>
-            </Pressable>
+
+                    {/* Separator */}
+                    <View style={[styles.detailsSeparator, { borderBottomColor: inputBorderColor }]} />
+
+                    {/* Description Section */}
+                    <Text style={[styles.descriptionTitle, { color: currentTheme.textPrimary }]}>
+                        About this event
+                    </Text>
+                    <Text style={[styles.detailsModalDesc, { color: currentTheme.textPrimary }]}>
+                        {selectedPost.description}
+                    </Text>
+                </ScrollView>
+
+                 {/* Action Buttons Footer */}
+                <View style={[styles.buttonContainer, { borderTopColor: inputBorderColor }]}>
+                    <TouchableOpacity
+                        style={[styles.actionButton, styles.joinButton, {backgroundColor: currentTheme.primary}]} // Use theme primary for join
+                        onPress={() => handleJoinChat(selectedPost)}
+                    >
+                        <Feather name="message-circle" size={18} color={currentTheme.buttonText || '#fff'} style={styles.buttonIcon} />
+                        <Text style={[styles.actionButtonText, { color: currentTheme.buttonText || '#fff' }]}>
+                            Join Chat
+                        </Text>
+                    </TouchableOpacity>
+                     <TouchableOpacity
+                        style={[styles.actionButton, styles.closeButtonAlt, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}
+                        onPress={closeDetailsModal}
+                    >
+                        <Text style={[styles.actionButtonText, { color: currentTheme.textSecondary }]}>
+                            Close
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+              </>
+            )}
+            {/* Optional Explicit Close Icon */}
+            <TouchableOpacity style={styles.modalCloseIcon} onPress={closeDetailsModal}>
+                <Feather name="x" size={28} color={currentTheme.textSecondary} />
+            </TouchableOpacity>
           </Pressable>
-        </Modal>
+        </Pressable>
+      </Modal>
 
-        {/* Filter Drawer Modal */}
-        <Modal
-          animationType="slide" // Slide in from the side (or 'fade')
-          transparent={true}
-          visible={isFilterDrawerVisible}
-          onRequestClose={() => setIsFilterDrawerVisible(false)} // Handle back button press
-        >
-          <TouchableOpacity
-            style={styles.drawerOverlay}
-            activeOpacity={1} // Prevent feedback when tapping overlay
-            onPressOut={() => setIsFilterDrawerVisible(false)} // Close drawer when tapping outside
-          >
-            <View
-              style={[
-                styles.drawerContainer,
-                { backgroundColor: currentTheme.background },
-              ]}
-            >
-              <ScrollView>
-                <Text
-                  style={[
-                    styles.drawerTitle,
-                    { color: currentTheme.textPrimary },
-                  ]}
-                >
-                  Filters & Sort
-                </Text>
+      {/* Filter Drawer Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={isFilterDrawerVisible}
+        onRequestClose={closeFilterDrawer}
+      >
+        <Pressable style={styles.drawerOverlay} onPress={closeFilterDrawer}>
+          {/* Use Pressable for content to stop overlay press propagation */}
+          <Pressable style={[styles.drawerContainer, { backgroundColor: currentTheme.background }]}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <Text style={[styles.drawerTitle, { color: currentTheme.textPrimary }]}>
+                Filters & Sort
+              </Text>
 
-                <View style={styles.drawerSection}>
-                  <Text
-                    style={[
-                      styles.drawerLabel,
-                      { color: currentTheme.textSecondary },
-                    ]}
+              {/* Category Filter */}
+              <View style={styles.drawerSection}>
+                <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Category</Text>
+                <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
+                  <Picker
+                    selectedValue={selectedCategory}
+                    onValueChange={(itemValue) => setSelectedCategory(itemValue || "All")}
+                    style={[styles.picker, { color: currentTheme.textPrimary }]}
+                    itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}} // iOS itemStyle
+                    dropdownIconColor={currentTheme.textPrimary}
+                    prompt="Select Category"
                   >
-                    Category
-                  </Text>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { borderColor: currentTheme.inputBorder },
-                    ]}
-                  >
-                    <Picker
-                      selectedValue={selectedCategory}
-                      onValueChange={(itemValue) =>
-                        setSelectedCategory(itemValue)
-                      }
-                      style={[
-                        styles.picker,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                      itemStyle={{
-                        color: currentTheme.textPrimary,
-                        backgroundColor: currentTheme.background,
-                      }} // Ensure item text is visible
-                      dropdownIconColor={currentTheme.textPrimary}
-                    >
-                      <Picker.Item label="All" value="All" />
-                      {interests.map((interest) => (
-                        <Picker.Item
-                          key={interest}
-                          label={interest}
-                          value={interest}
-                        />
-                      ))}
-                    </Picker>
-                  </View>
+                    <Picker.Item label="All Categories" value="All" />
+                    {/* Use INTEREST_OPTIONS defined globally or fetched */}
+                    {INTEREST_OPTIONS.map((interest) => (
+                      <Picker.Item key={interest} label={interest} value={interest} />
+                    ))}
+                  </Picker>
                 </View>
+              </View>
 
-                <View style={styles.drawerSection}>
-                  <Text
-                    style={[
-                      styles.drawerLabel,
-                      { color: currentTheme.textSecondary },
-                    ]}
-                  >
-                    Sort By
-                  </Text>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { borderColor: currentTheme.inputBorder },
-                    ]}
-                  >
-                    <Picker
-                      selectedValue={sortOrder}
-                      onValueChange={(itemValue) => setSortOrder(itemValue)}
-                      style={[
-                        styles.picker,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                      itemStyle={{
-                        color: currentTheme.textPrimary,
-                        backgroundColor: currentTheme.background,
-                      }}
-                      dropdownIconColor={currentTheme.textPrimary}
-                    >
-                      <Picker.Item label="Oldest First" value="asc" />
-                      <Picker.Item label="Newest First" value="desc" />
-                    </Picker>
-                  </View>
-                </View>
+              {/* Sort Order */}
+               <View style={styles.drawerSection}>
+                 <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Sort By Date</Text>
+                 <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
+                   <Picker
+                     selectedValue={sortOrder}
+                     onValueChange={(itemValue) => setSortOrder(itemValue as "desc" | "asc")}
+                     style={[styles.picker, { color: currentTheme.textPrimary }]}
+                     itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
+                     dropdownIconColor={currentTheme.textPrimary}
+                     prompt="Sort Order"
+                   >
+                     <Picker.Item label="Newest First" value="desc" />
+                     <Picker.Item label="Oldest First" value="asc" />
+                   </Picker>
+                 </View>
+               </View>
 
+               {/* Distance Filter (UI only) */}
                 <View style={styles.drawerSection}>
-                  <Text
-                    style={[
-                      styles.drawerLabel,
-                      { color: currentTheme.textSecondary },
-                    ]}
-                  >
-                    Distance
-                  </Text>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { borderColor: currentTheme.inputBorder },
-                    ]}
-                  >
+                  <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Distance</Text>
+                  <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
                     <Picker
                       selectedValue={distanceRadius}
-                      onValueChange={(itemValue) =>
-                        setDistanceRadius(
-                          itemValue as "All" | "1km" | "5km" | "10km"
-                        )
-                      }
-                      style={[
-                        styles.picker,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                      itemStyle={{
-                        color: currentTheme.textPrimary,
-                        backgroundColor: currentTheme.background,
-                      }}
+                      onValueChange={(itemValue) => setDistanceRadius(itemValue as "All" | "1km" | "5km" | "10km")}
+                      style={[styles.picker, { color: currentTheme.textPrimary }]}
+                      itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
                       dropdownIconColor={currentTheme.textPrimary}
+                      prompt="Select Distance"
+                      // enabled={false} // Disable until implemented
                     >
-                      <Picker.Item label="All Distances" value="All" />
-                      <Picker.Item label="Within 1 km" value="1km" />
-                      <Picker.Item label="Within 5 km" value="5km" />
-                      <Picker.Item label="Within 10 km" value="10km" />
+                      {/* <Picker.Item label="All Distances" value="All" />
+                      <Picker.Item label="Within 1 km (soon)" value="1km" disabled={true}/>
+                      <Picker.Item label="Within 5 km (soon)" value="5km" disabled={true}/>
+                      <Picker.Item label="Within 10 km (soon)" value="10km" disabled={true}/> */}
                     </Picker>
                   </View>
+                  <Text style={styles.comingSoonText}>(Distance filter coming soon!)</Text>
                 </View>
 
+               {/* Fee Filter */}
                 <View style={styles.drawerSection}>
-                  <Text
-                    style={[
-                      styles.drawerLabel,
-                      { color: currentTheme.textSecondary },
-                    ]}
-                  >
-                    Fee
-                  </Text>
-                  <View
-                    style={[
-                      styles.pickerWrapper,
-                      { borderColor: currentTheme.inputBorder },
-                    ]}
-                  >
+                  <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Fee</Text>
+                  <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
                     <Picker
                       selectedValue={selectedFee}
-                      onValueChange={(itemValue) =>
-                        setSelectedFee(itemValue as "All" | "Free" | "Paid")
-                      }
-                      style={[
-                        styles.picker,
-                        { color: currentTheme.textPrimary },
-                      ]}
-                      itemStyle={{
-                        color: currentTheme.textPrimary,
-                        backgroundColor: currentTheme.background,
-                      }}
+                      onValueChange={(itemValue) => setSelectedFee(itemValue as "All" | "Free" | "Paid")}
+                      style={[styles.picker, { color: currentTheme.textPrimary }]}
+                      itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
                       dropdownIconColor={currentTheme.textPrimary}
+                      prompt="Select Fee Type"
                     >
                       <Picker.Item label="All Fees" value="All" />
                       <Picker.Item label="Free Only" value="Free" />
@@ -826,397 +741,360 @@ export default function HomeScreen() {
                   </View>
                 </View>
 
-                <TouchableOpacity
-                  style={[
-                    styles.drawerCloseButton,
-                    { backgroundColor: currentTheme.primary },
-                  ]}
-                  onPress={() => setIsFilterDrawerVisible(false)}
-                >
-                  <Text
-                    style={[
-                      styles.drawerCloseButtonText,
-                      { color: currentTheme.buttonText },
-                    ]}
-                  >
-                    Done
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            </View>
-          </TouchableOpacity>
-        </Modal>
-      </SafeAreaView>
-    </LinearGradient>
+              {/* Drawer Close Button */}
+              <TouchableOpacity
+                style={[styles.drawerCloseButton, { backgroundColor: currentTheme.primary }]}
+                onPress={closeFilterDrawer}
+              >
+                <Text style={[styles.drawerCloseButtonText, { color: currentTheme.buttonText || '#fff' }]}>
+                  Apply Filters
+                </Text>
+              </TouchableOpacity>
+              <View style={{ height: 30 }} />{/* Bottom Spacer */}
+            </ScrollView>
+             {/* Optional Explicit Close Icon for Drawer */}
+             <TouchableOpacity style={styles.drawerCloseIcon} onPress={closeFilterDrawer}>
+                <Feather name="x" size={28} color={currentTheme.textSecondary} />
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+    </SafeAreaView>
   );
 }
 
-const screenWidth = Dimensions.get("window").width; // Get screen width
-
+// --- Styles ---
+const screenWidth = Dimensions.get("window").width;
 const styles = StyleSheet.create({
-  container: {
+  screenContainer: { // Replaces container
     flex: 1,
-    paddingHorizontal: 15,
-    paddingTop: 15,
+    // Background color set dynamically
   },
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    // paddingHorizontal: 15, // Main horizontal padding
-    marginBottom: 15,
-    marginTop: 10, // Add some top margin if needed
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    // borderBottomColor: currentTheme.inputBorder // Use theme border
   },
   searchContainer: {
-    flex: 1, // Search takes up remaining space
+    flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f9f9f9",
     borderRadius: 10,
     paddingHorizontal: 12,
-    // Removed margin bottom, handled by headerContainer
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-    borderWidth: 1, // Add border
-    borderColor: "#eee", // Use theme border color
+    borderWidth: 1,
+    height: 44, // Consistent height
+    // Dynamic background and border color
   },
   searchIcon: {
     marginRight: 8,
   },
   searchInput: {
     flex: 1,
-    backgroundColor: "transparent", // Container has the background now
-    paddingVertical: 12,
+    paddingVertical: 0, // Remove default padding if height is set
     fontSize: 16,
-    borderRadius: 10,
-    // color set dynamically
+    // Dynamic color
   },
+   clearSearchButton: {
+      padding: 4, // Make it easier to tap
+      marginLeft: 4,
+   },
   filterTriggerButton: {
-    marginLeft: 8, // Space between search bar and button
-    padding: 8, // Make it easy to tap
-    // backgroundColor: currentTheme.inputBackground,
+    marginLeft: 10,
+    padding: 8,
   },
+  centerStatusContainer: { // For Loading and Empty states
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    padding: 20,
+  },
+  statusTitle: {
+     fontSize: 20,
+     fontWeight: 'bold',
+     marginTop: 15,
+     marginBottom: 8,
+     textAlign: 'center',
+  },
+  statusText: {
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 22,
+  },
+  listContainer: { // For FlatList
+    paddingHorizontal: 15,
+    paddingTop: 10,
+    paddingBottom: 30,
+  },
+  // --- Card Styles (renderPostCard) ---
+  card: {
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 16,
+    borderWidth: 1,
+    // Dynamic background, border, shadow colors
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
+  },
+  cardTopRow: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     marginBottom: 10,
+  },
+  creatorInfoSmall: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     flex: 1, // Allow shrinking/growing
+     paddingRight: 10, // Prevent overlap with bookmark
+  },
+  creatorAvatarSmall: {
+     width: 28,
+     height: 28,
+     borderRadius: 14,
+     marginRight: 8,
+  },
+  creatorNameSmall: {
+     fontSize: 13,
+     fontWeight: '500',
+     flexShrink: 1, // Allow text to shrink if needed
+  },
+  saveIconButton: {
+     paddingLeft: 10, // Increase tappable area
+     paddingVertical: 5,
+  },
+  cardTitle: {
+    fontSize: 17,
+    fontWeight: 'bold',
+    marginBottom: 6,
+    lineHeight: 24,
+  },
+  cardDescShort: {
+    fontSize: 14,
+    lineHeight: 20,
+    marginTop: 8,
+    marginBottom: 12,
+  },
+   cardBottomRow: {
+     flexDirection: 'row',
+     justifyContent: 'space-between',
+     alignItems: 'center',
+     borderTopWidth: StyleSheet.hairlineWidth,
+     marginTop: 10,
+     paddingTop: 10,
+     flexWrap: 'wrap', // Allow wrapping on small screens
+   },
+   cardInfoItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginRight: 12, // Space between items
+     marginBottom: 5, // Space if items wrap
+   },
+   cardInfoText: {
+     fontSize: 13,
+     marginLeft: 4,
+   },
+   iconStyle: {
+      // Shared style for small icons in card bottom/date rows
+   },
+   dateTimeRow: { // If needed for card internal layout
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+   cardDateTime: { // If needed for card internal layout
+    fontSize: 13,
+    marginLeft: 4,
+  },
+
   // --- Filter Drawer Styles ---
   drawerOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.6)",
-    // No justifyContent/alignItems needed here if drawer is positioned absolutely
+    backgroundColor: "rgba(0, 0, 0, 0.5)", // Semi-transparent background
   },
   drawerContainer: {
     position: "absolute",
     top: 0,
     bottom: 0,
-    right: 0, // Slides in from the right
-    width: Math.min(screenWidth * 0.85, 400), // 85% of screen width, max 400dp
-    // backgroundColor set dynamically
-    paddingTop: 40, // Space for status bar or notch
+    right: 0,
+    width: Math.min(screenWidth * 0.85, 350), // Limit width
+    paddingTop: Platform.OS === 'ios' ? 50 : 30, // Adjust top padding for status bar/notch
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 30,
     shadowColor: "#000",
     shadowOffset: { width: -2, height: 0 },
-    shadowOpacity: 0.3,
-    shadowRadius: 5,
+    shadowOpacity: 0.25,
+    shadowRadius: 6,
     elevation: 10,
+    // Dynamic background color
   },
+   drawerCloseIcon: {
+     position: 'absolute',
+     top: Platform.OS === 'ios' ? 45 : 15,
+     right: 15,
+     padding: 10,
+     zIndex: 1, // Ensure it's tappable
+   },
   drawerTitle: {
     fontSize: 22,
     fontWeight: "bold",
     marginBottom: 25,
-    // color set dynamically
     textAlign: "center",
   },
   drawerSection: {
-    marginBottom: 20, // Space between filter sections
+    marginBottom: 22,
   },
   drawerLabel: {
-    fontSize: 16,
-    fontWeight: "500",
-    marginBottom: 8,
-    // color set dynamically
+    fontSize: 15,
+    fontWeight: "600", // Bolder label
+    marginBottom: 10,
   },
   pickerWrapper: {
-    // Add a wrapper for border and consistent styling
-    borderRadius: 8,
+    borderRadius: 10,
     borderWidth: 1,
-    // borderColor set dynamically
-    // backgroundColor: currentTheme.inputBackground, // Optional: if picker bg is transparent
-    overflow: "hidden", // Ensures border radius applies to picker too
+    overflow: "hidden", // Clip picker on Android
+    justifyContent: 'center', // Align picker text vertically
+    height: 55, // Consistent height
+    // Dynamic background and border color
   },
   picker: {
     width: "100%",
-    // backgroundColor: 'transparent', // Make picker bg transparent if wrapper has it
-    // color set dynamically
+    height: '100%',
+    // Dynamic color
   },
   drawerCloseButton: {
     paddingVertical: 14,
-    borderRadius: 10,
+    borderRadius: 25, // Rounded button
     alignItems: "center",
-    marginTop: 20, // Space above the close button
-    // backgroundColor set dynamically
+    marginTop: 25, // Space above button
   },
   drawerCloseButtonText: {
     fontWeight: "bold",
     fontSize: 16,
-    // color set dynamically
   },
-  filterSortContainer: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    marginBottom: 15,
+  comingSoonText: {
+     fontSize: 12,
+     fontStyle: 'italic',
+     textAlign: 'center',
+     marginTop: 5,
+     opacity: 0.7,
+     color: '#757575', // Use theme color
   },
-  pickerContainer: {
-    flex: 1,
-    marginRight: 10,
-  },
-  filterLabel: {
-    fontWeight: "600",
-    marginBottom: 5,
-  },
-  list: {
-    paddingBottom: 20,
-  },
-  center: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  card: {
-    padding: 15,
-    borderRadius: 12,
-    marginBottom: 12,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: "#ddd",
-  },
-  cardTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#111",
-    marginBottom: 6, // separate title from date nicely
-  },
-  cardDateTime: {
-    color: "#555",
-    fontSize: 13,
-    marginBottom: 8,
-  },
-  cardDescShort: {
-    marginTop: 8,
-    fontSize: 15,
-    lineHeight: 22,
-    marginBottom: 10,
-  },
-  separator: {
-    borderBottomWidth: 1,
-    borderColor: "#ddd",
-    marginBottom: 10,
-  },
-  cardBottom: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-  },
-  cardCategory: {
-    fontSize: 14,
-    color: "#555",
-  },
-  cardFee: {
-    fontSize: 14,
-    fontWeight: "bold",
-    color: "#333",
-  },
-  cardShadow: {
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.5)",
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    padding: 20,
-    borderRadius: 15,
-    width: "90%",
-    maxHeight: "80%",
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    marginBottom: 10,
-  },
-  modalDateTime: {
-    color: "#555",
-    fontSize: 14,
-    marginBottom: 15,
-  },
-  modalDesc: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 15,
-  },
-  modalBottom: {
-    marginTop: 15,
-  },
-  modalCategory: {
-    fontSize: 16,
-    marginBottom: 5,
-  },
-  modalFee: {
-    fontSize: 16,
-    fontWeight: "bold",
-    marginBottom: 5,
-  },
-  modalLocation: {
-    fontSize: 16,
-    marginBottom: 10,
-  },
-  closeButton: {
-    backgroundColor: "#007bff",
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 20,
-  },
-  closeButtonText: {
-    color: "#fff",
-    fontWeight: "bold",
-    fontSize: 16,
-  },
-  // --- Styles for Revamped Post Details Modal ---
+
+  // --- Post Details Modal Styles ---
   detailsModalOverlay: {
-    // Replaces modalOverlay for clarity
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.65)", // Slightly darker overlay
-    justifyContent: "center",
-    alignItems: "center",
-    paddingHorizontal: 15, // Ensures modal doesn't touch edges
-    paddingVertical: 30, // Give space top/bottom
+    backgroundColor: "rgba(0, 0, 0, 0.6)", // Slightly less opaque
+    justifyContent: "flex-end", // Modal comes from bottom
   },
   detailsModalContent: {
-    // Replaces modalContent
-    width: "100%", // Take full width within overlay padding
-    maxWidth: 500, // Max width for very large screens/tablets
-    maxHeight: "95%", // Allow more height
-    borderRadius: 18, // Softer corners
-    overflow: "hidden", // Clip content like ScrollView & Buttons
-    elevation: 8,
+    width: "100%",
+    maxHeight: "90%", // Limit height
+    borderTopLeftRadius: 20, // Rounded top corners
+    borderTopRightRadius: 20,
+    overflow: "hidden",
+    elevation: 10,
     shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
-    backgroundColor: "",
-    // Use Pressable instead of View here to stop propagation if needed
+    shadowOffset: { width: 0, height: -3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    paddingTop: 10, // Add padding at the very top for handle or spacing
+    // Dynamic background color
   },
   modalCloseIcon: {
-    // Optional X button
     position: "absolute",
-    top: 12,
-    right: 12,
+    top: 15,
+    right: 15,
     padding: 5,
-    zIndex: 10, // Ensure it's above scroll content
+    zIndex: 10,
   },
   detailsScrollContainer: {
-    // Padding inside the scroll view
     paddingHorizontal: 20,
-    paddingTop: 25, // Extra top padding
-    paddingBottom: 10, // Padding before the fixed buttons
+    paddingTop: 15, // Less top padding inside scroll
+    paddingBottom: 20,
   },
   creatorInfoContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 18,
-    alignSelf: "flex-start", // Don't stretch full width
+    marginBottom: 15,
+    alignSelf: "flex-start",
   },
   creatorAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: 18, // Make it circular
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     marginRight: 12,
-  },
-  creatorAvatarPlaceholder: {
-    borderWidth: 1,
-    borderColor: "#ddd", // Use theme color later maybe
+    borderWidth: 2, // Add border matching modal background
   },
   creatorNameText: {
     fontSize: 16,
     fontWeight: "600",
-    // color set dynamically (using primary theme color)
   },
   detailsModalTitle: {
-    // Replaces modalTitle
-    fontSize: 26, // Larger title
-    fontWeight: "bold", // Bold
-    marginBottom: 20, // More space below title
-    lineHeight: 34,
-    // color set dynamically
+    fontSize: 24, // Slightly smaller title
+    fontWeight: "bold",
+    marginBottom: 18,
+    lineHeight: 32,
   },
   detailsSection: {
-    marginBottom: 15, // Space below the details block
+    marginBottom: 15,
   },
   detailRow: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 14, // Space between detail rows
+    alignItems: "flex-start", // Align items top for potentially long text
+    marginBottom: 14,
   },
   detailIcon: {
-    marginRight: 12, // Space between icon and text
-    width: 20, // Ensure alignment
+    marginRight: 15, // More space for icon
+    marginTop: 2, // Align icon slightly lower
+    width: 20,
     textAlign: "center",
   },
   detailText: {
     fontSize: 15,
     lineHeight: 22,
     flex: 1, // Allow text to wrap
-    // color set dynamically
   },
   detailFee: {
-    fontWeight: "500", // Slightly bolder fee
+    fontWeight: "bold", // Make fee stand out
   },
   detailsSeparator: {
-    // Replaces separator inside modal
-    height: 1,
-    borderBottomWidth: StyleSheet.hairlineWidth, // Thinner line
-    marginVertical: 15, // Space around separator
-    // borderBottomColor set dynamically
+    height: StyleSheet.hairlineWidth,
+    backgroundColor: '#ccc', // Use theme color
+    marginVertical: 20,
   },
   descriptionTitle: {
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 10,
-    // color set dynamically
   },
   detailsModalDesc: {
-    // Replaces modalDesc
-    fontSize: 16,
-    lineHeight: 25, // Improved readability
-    marginBottom: 25, // Space after description
-    // color set dynamically
+    fontSize: 15, // Slightly smaller description
+    lineHeight: 24,
+    marginBottom: 25,
   },
-  // --- Button Area (Fixed at the bottom of the modal) ---
   buttonContainer: {
-    padding: 15,
+    paddingHorizontal: 15,
+    paddingVertical: 15,
     paddingTop: 10,
-    borderTopWidth: 1,
-    // borderTopColor: currentTheme.inputBorder, // Use theme border
-    // backgroundColor: currentTheme.background, // Match modal background
-    flexDirection: "row", // Arrange buttons side-by-side
-    justifyContent: "space-between", // Space them out
+    borderTopWidth: StyleSheet.hairlineWidth,
+    flexDirection: "row",
+    justifyContent: "space-between",
   },
   actionButton: {
-    flexDirection: "row", // Icon and text side-by-side
+    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 10,
-    flex: 1, // Make buttons share space (almost equally)
+    borderRadius: 25, // Fully rounded buttons
+    flex: 1, // Equal width
   },
   actionButtonText: {
     fontWeight: "bold",
@@ -1227,25 +1105,15 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   joinButton: {
-    backgroundColor: "#28a745", // Green for primary action
-    marginRight: 10, // Space between buttons
+    // backgroundColor: currentTheme.primary, // Use theme primary
+    marginRight: 10,
   },
-  joinButtonText: {
-    color: "#fff", // White text on green button
-  },
+  // joinButtonText: { // Text color defined by buttonText in theme
+  // },
   closeButtonAlt: {
-    // Alternative close button style (replaces old 'closeButton')
-    // backgroundColor set dynamically using theme inputBackground
-    borderWidth: 1,
-    borderColor: "#eee",
-  },
-  cardHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 6,
-  },
-  saveIconButton: {
-    padding: 5,
+    // Secondary button style
+    marginLeft: 10,
+    borderWidth: 1.5,
+    // Dynamic background and border color
   },
 });
