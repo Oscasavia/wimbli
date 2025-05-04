@@ -6,6 +6,7 @@ import {
   Text,
   StyleSheet,
   Alert,
+  Image
 } from "react-native";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from "../firebase";
@@ -39,7 +40,11 @@ export default function ForgotPasswordScreen() {
       {/* Logo + App Name */}
       <View style={styles.logoContainer}>
         <View style={styles.logoCircle}>
-          <FontAwesome name="handshake-o" size={32} color="#00796B" />
+          {/* <FontAwesome name="handshake-o" size={32} color="#00796B" /> */}
+          <Image
+            source={require("../assets/wimbli-icon-bg.png")}
+            style={{ width: 85, height: 85, resizeMode: "contain" }}
+          />
         </View>
         <Text style={styles.appName}>Wimbli</Text>
       </View>
@@ -108,6 +113,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: "bold",
+    fontStyle: "italic",
     color: "#00796B",
   },
   card: {

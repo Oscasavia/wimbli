@@ -6,10 +6,13 @@ import {
   StyleSheet,
   Text,
   Alert,
+  Image,
+  SafeAreaView
 } from "react-native";
 import { createUserWithEmailAndPassword, updateProfile } from "firebase/auth";
 import { auth } from "../firebase";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import CheckBox from "expo-checkbox";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -44,10 +47,18 @@ export default function SignupScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+          colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
+          style={{ flex: 1 }}
+        >
+          <SafeAreaView style={styles.container}>
       <View style={styles.logoContainer}>
         <View style={styles.logoCircle}>
-          <FontAwesome name="handshake-o" size={32} color="#00796B" />
+          {/* <FontAwesome name="handshake-o" size={32} color="#00796B" /> */}
+          <Image
+            source={require("../assets/wimbli-icon-bg.png")}
+            style={{ width: 85, height: 85, resizeMode: "contain" }}
+          />
         </View>
         <Text style={styles.appName}>Wimbli</Text>
       </View>
@@ -188,14 +199,15 @@ export default function SignupScreen() {
           </Text>
         </Text>
       </View>
-    </View>
+    </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#E0F7FA",
+    // backgroundColor: "#E0F7FA",
     justifyContent: "center",
     alignItems: "center",
     padding: 10,
@@ -216,6 +228,7 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: "bold",
+    fontStyle: "italic",
     color: "#00796B",
   },
   card: {

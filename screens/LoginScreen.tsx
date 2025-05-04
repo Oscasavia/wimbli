@@ -5,12 +5,16 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
+  Image,
+  Platform
 } from "react-native";
 import { FontAwesome, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
+import { LinearGradient } from "expo-linear-gradient";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../firebase";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function LoginScreen() {
   const [email, setEmail] = useState("");
@@ -29,11 +33,19 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
+    <LinearGradient
+      colors={["#E0F7FA", "#F5FDFD", "#ffffff"]}
+      style={{ flex: 1 }}
+    >
+      <SafeAreaView style={styles.container}>
       {/* Logo Placeholder */}
       <View style={styles.logoContainer}>
         <View style={styles.logoCircle}>
-          <FontAwesome name="handshake-o" size={32} color="#00796B" />
+          {/* <FontAwesome name="handshake-o" size={32} color="#00796B" /> */}
+          <Image
+            source={require("../assets/wimbli-icon-bg.png")}
+            style={{ width: 85, height: 85, resizeMode: "contain" }}
+          />
         </View>
         <Text style={styles.appName}>Wimbli</Text>
       </View>
@@ -99,14 +111,15 @@ export default function LoginScreen() {
           </Text>
         </Text>
       </View>
-    </View>
+      </SafeAreaView>
+    </LinearGradient>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#E0F7FA",
+    // backgroundColor: "#E0F7FA",
     justifyContent: "center",
     alignItems: "center",
     padding: 10,
@@ -127,8 +140,9 @@ const styles = StyleSheet.create({
   appName: {
     fontSize: 28,
     fontWeight: "bold",
+    fontStyle: "italic",
     color: "#00796B",
-    marginBottom: 20,
+    // marginBottom: 20,
   },
   card: {
     width: "100%",
@@ -173,6 +187,11 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     alignItems: "center",
     marginTop: 10,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+    elevation: 2,
   },
   loginButtonText: {
     color: "#fff",
