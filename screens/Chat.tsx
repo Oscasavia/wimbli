@@ -181,13 +181,17 @@ export default function Chat() {
         Alert.alert("Error", "Could not load messages.");
         setLoadingMessages(false);
     });
-
-    // Mark chat as seen when entering
-    AsyncStorage.setItem(`lastSeen_${groupId}`, new Date().toISOString());
-
+        
+    // --- Cleanup function: Mark as read on EXIT ---
     return () => {
-        console.log("Unsubscribing messages listener.");
-        unsubscribe();
+        console.log("ChatScreen exiting. Unsubscribing messages listener and updating lastSeen.");
+        unsubscribe(); // Unsubscribe from message listener
+
+        // Update lastSeen again when leaving the screen
+        // Use a new timestamp reflecting the time of exit
+        AsyncStorage.setItem(`lastSeen_${groupId}`, new Date().toISOString())
+          .then(() => console.log(`Updated lastSeen_${groupId} on exit.`))
+          .catch(err => console.error("Error setting lastSeen on exit:", err));
     };
   }, [groupId]); // Only depends on groupId
 
