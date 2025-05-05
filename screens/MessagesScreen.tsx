@@ -7,6 +7,7 @@ import {
   TextInput,
   StyleSheet,
   Alert,
+  StatusBar,
   ActivityIndicator, // Added for loading state
   Platform, // Added for platform-specific styles
 } from "react-native";
@@ -45,6 +46,7 @@ export default function MessagesScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
   const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
   const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
@@ -255,14 +257,14 @@ export default function MessagesScreen() {
   // --- Render Component ---
   return (
     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-      <Text style={[styles.pageTitle, { color: currentTheme.textPrimary }]}>
-        Group Chats
-      </Text>
-
+      <StatusBar
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
+      <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
       {/* Search Bar */}
-      <View style={[styles.searchBarContainer, { borderBottomColor: separatorColor }]}>
-         <View style={[styles.searchBar, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <Feather name="search" size={18} color={placeholderTextColor} style={styles.searchIcon} />
+      <View style={[styles.searchContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
+           <Feather name="search" size={20} color={placeholderTextColor} style={styles.searchIcon} />
            <TextInput
              placeholder="Search chats..."
              placeholderTextColor={placeholderTextColor}
@@ -314,6 +316,21 @@ const styles = StyleSheet.create({
   screenContainer: {
       flex: 1,
   },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Use theme border
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
+  },
   pageTitle: {
     fontSize: 24, // Slightly larger title
     fontWeight: 'bold',
@@ -321,10 +338,15 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10, // Less margin below title
   },
-  searchBarContainer: { // Add container for potential border
-     paddingHorizontal: 16,
-     paddingBottom: 10, // Space below search bar
-     // borderBottomWidth: 1, // Optional separator below header
+  searchContainer: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    borderWidth: 1,
+    height: 44, // Consistent height
+    // Dynamic background and border color
   },
   searchBar: {
     flexDirection: 'row',

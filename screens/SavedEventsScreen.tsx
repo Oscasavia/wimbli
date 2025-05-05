@@ -8,6 +8,8 @@ import {
     ActivityIndicator,
     TouchableOpacity,
     Image,
+    Platform,
+    StatusBar,
     Alert // Added Alert
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -223,8 +225,13 @@ export default function SavedEventsScreen() {
                          </TouchableOpacity>
                     </View>
 
+                    {/* Optional: Short Description or Location */}
+                    <Text style={[styles.cardDescShort, { color: currentTheme.textSecondary }]} numberOfLines={2}>
+                         {item.description}
+                     </Text>
+
                     {/* Info Row: Date, Category, Fee */}
-                    <View style={styles.cardInfoRow}>
+                    <View style={[styles.cardInfoRow, { borderTopColor: cardBorderColor, borderTopWidth: StyleSheet.hairlineWidth, }]}>
                          <View style={styles.cardInfoItem}>
                              <Feather name="calendar" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
                              <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]}>{displayDate}</Text>
@@ -240,12 +247,6 @@ export default function SavedEventsScreen() {
                             </Text>
                          </View>
                     </View>
-
-                     {/* Optional: Short Description or Location */}
-                     {/* <Text style={[styles.cardDescShort, { color: currentTheme.textSecondary }]} numberOfLines={2}>
-                         {item.description}
-                     </Text> */}
-
                 </View>
             </TouchableOpacity>
         );
@@ -280,7 +281,18 @@ export default function SavedEventsScreen() {
 
     // Main List View
     return (
-        <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+        <SafeAreaView style={{ flex: 1 }}>
+            <StatusBar
+              backgroundColor={cardBackgroundColor}
+              // barStyle={isDark ? "light-content" : "dark-content"}
+            />
+            <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+               {/* Screen Title */}
+               <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+                <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+                    Saved Events
+                </Text>
+               </View>
              <FlatList
                 data={savedEvents}
                 renderItem={renderSavedEventCard}
@@ -289,15 +301,40 @@ export default function SavedEventsScreen() {
                 ItemSeparatorComponent={() => <View style={{ height: 10 }} />} // Add space between cards instead of a line
                 showsVerticalScrollIndicator={false}
              />
+             </View>
         </SafeAreaView>
     );
 }
 
 // --- Styles --- (Adapt from ManagePostsScreen or HomeScreen)
 const styles = StyleSheet.create({
-  screenContainer: {
+  screen: {
     flex: 1,
   },
+  headerContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: 'center',
+        paddingHorizontal: 15,
+        paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+        paddingBottom: 10,
+        // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+        borderBottomWidth: 1,
+        borderBottomColor: 'transparent', // Use theme border
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.08,
+        shadowRadius: 5,
+        elevation: 3,
+    },
+    screenTitle: {
+        fontSize: 24,
+        fontWeight: "bold",
+        textAlign: "center",
+        marginTop: '1.9%',
+        marginBottom: 4,
+        // paddingHorizontal: 20,
+        paddingHorizontal: 12,
+    },
   listContainer: {
     paddingHorizontal: 16,
     paddingTop: 20, // Space below header (now native)
@@ -342,7 +379,7 @@ const styles = StyleSheet.create({
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start', // Align items top
-      marginBottom: 10,
+    //   marginBottom: 10,
   },
   cardTitle: {
     fontSize: 17,
@@ -367,6 +404,7 @@ const styles = StyleSheet.create({
      alignItems: 'center',
      marginTop: 8, // Space above info row
      flexWrap: 'wrap',
+     paddingTop: 8,
    },
    cardInfoItem: {
      flexDirection: 'row',

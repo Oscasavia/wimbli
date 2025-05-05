@@ -10,10 +10,11 @@ import {
   FlatList, // Keep import if used elsewhere, though not directly in this example output
   Modal,
   Alert, // Keep import if used elsewhere
+  StatusBar,
   Pressable,
 } from "react-native";
 import { auth, db } from "../firebase";
-import { doc, getDoc } from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
+import { doc, getDoc, collection, query, where, getCountFromServer } from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -28,6 +29,8 @@ export default function ProfileScreen() {
   const { userId } = route.params || {};
   const [loading, setLoading] = useState(true);
   const [userData, setUserData] = useState<any>(null);
+  const [postCount, setPostCount] = useState(0);
+  const [savedEventsCount, setSavedEventsCount] = useState(0);
   const [isModalVisible, setModalVisible] = useState(false);
   const [isSettingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const { theme } = useTheme();
@@ -55,8 +58,10 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const fetchUser = async () => {
+      const fetchUserAndCounts = async () => {
         setLoading(true); // Show loader when focus changes
+        setPostCount(0); // Reset count on focus
+        setSavedEventsCount(0);
         try {
           const uid = userId || auth.currentUser?.uid;
           if (!uid) {
@@ -65,28 +70,43 @@ export default function ProfileScreen() {
             return;
           }
 
-          const docSnap = await getDoc(doc(db, "users", uid));
-          if (docSnap.exists()) {
-            setUserData(docSnap.data());
-          } else {
-             console.log("No user data found in Firestore for UID:", uid);
-             // Set minimal data from auth if needed, or handle appropriately
-             setUserData({
-                 // You might want some fallback data if Firestore doc doesn't exist
-                 displayName: auth.currentUser?.displayName,
-                 email: auth.currentUser?.email,
-                 // profilePicture: auth.currentUser?.photoURL // If available
-             });
-          }
-        } catch (error) {
-          console.error("Error loading profile:", error);
-          // Optionally set an error state here
-        } finally {
-          setLoading(false);
-        }
-      };
+          // --- Fetch User Data ---
+        const userDocSnap = await getDoc(doc(db, "users", uid));
+        let fetchedUserData: any = null; // Temp variable to hold data
 
-      fetchUser();
+        if (userDocSnap.exists()) {
+          fetchedUserData = userDocSnap.data();
+          setUserData(fetchedUserData);
+        } else {
+          console.log("No user data found in Firestore for UID:", uid);
+          fetchedUserData = { /* fallback data */ };
+          setUserData(fetchedUserData);
+        }
+        // --- END Fetch User Data ---
+
+        // --- Calculate Saved Events Count ---
+        // *** IMPORTANT: Ensure 'savedPosts' is the correct field name in your Firestore user document ***
+        const savedIds = fetchedUserData?.savedPosts || [];
+        setSavedEventsCount(savedIds.length);
+        console.log(`Saved events count for ${uid}: ${savedIds.length}`);
+        // --- END Calculate Saved Events Count ---
+
+        // --- Query for Post Count (existing code) ---
+        const postsRef = collection(db, "posts");
+        const q = query(postsRef, where("createdBy", "==", uid));
+        const countSnapshot = await getCountFromServer(q);
+        setPostCount(countSnapshot.data().count);
+        console.log(`Post count for ${uid}: ${countSnapshot.data().count}`);
+        // --- END Query for Post Count ---
+
+      } catch (error) {
+        console.error("Error loading profile data/counts:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchUserAndCounts();
       // Clean-up function (optional)
       // return () => { console.log("Profile screen unfocused"); };
     }, [userId]) // Dependency array includes userId to refetch if navigating to a different profile
@@ -110,7 +130,9 @@ export default function ProfileScreen() {
   const userInterests = userData?.interests || [];
   // Placeholder Stats (replace with actual data if available)
   const stats = {
-      posts: userData?.postCount || 0,
+      // posts: userData?.postCount || 0,
+      posts: postCount,
+      saved: savedEventsCount,
       followers: userData?.followerCount || 0,
       following: userData?.followingCount || 0,
   };
@@ -119,6 +141,10 @@ export default function ProfileScreen() {
   return (
     // Use theme background instead of fixed gradient, or adjust gradient to use theme colors
     <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
+      <StatusBar
+        backgroundColor={currentTheme.background}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
       <ScrollView
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
@@ -171,13 +197,13 @@ export default function ProfileScreen() {
         {/* You'll need to fetch actual counts for these */}
         <View style={[styles.statsContainer, styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
             <View style={styles.statItem}>
-                <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{stats.posts}</Text>
-                <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Posts</Text>
+            <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{postCount}</Text>
+            <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Posts</Text>
             </View>
             <View style={styles.statSeparator}></View>
             <View style={styles.statItem}>
-                <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{stats.followers}</Text>
-                <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Events Saved</Text>
+            <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{savedEventsCount}</Text>
+            <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Events Saved</Text>
             </View>
         </View>
 
@@ -342,12 +368,12 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: "center",
-    marginTop: 40, // Space below settings icon
+    marginTop: 20, // Space below settings icon
     marginBottom: 20,
     width: '100%',
   },
   avatarContainer: {
-    marginBottom: 15,
+    marginBottom: 5,
     // Add shadow to avatar container for depth
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },

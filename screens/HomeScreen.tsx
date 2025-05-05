@@ -27,6 +27,7 @@ import {
   addDoc,
   serverTimestamp,
   updateDoc,
+  arrayRemove,
   arrayUnion,
   getDoc,
   Timestamp, // Import Timestamp
@@ -137,6 +138,7 @@ export default function HomeScreen() {
       const userDocRef = doc(db, "users", userId);
       unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
         const interestsData = userDoc.data()?.interests || [];
+        const savedPostsData = userDoc.data()?.savedPosts || [];
         // Use the robust comparison logic from previous step
         setUserInterests((prevInterests) => {
             // console.log('--- Comparing Interests ---'); // Keep logs if needed
@@ -151,6 +153,8 @@ export default function HomeScreen() {
             }
         });
         // Fetch persisted saved posts state here if implemented
+        // Update local state only if fetched data differs
+       setSavedPosts((prev) => savedPostsAreEqual(prev, savedPostsData) ? prev : savedPostsData);
       }, (error) => {
         console.error("Error fetching user data:", error);
         setLoading(false); // Stop loading on user fetch error
@@ -298,33 +302,38 @@ export default function HomeScreen() {
   };
 
   const handleToggleSave = async (postId: string) => {
-    // NOTE: This updates local state only. For persistence:
-    // 1. Fetch current saved posts from Firestore user doc.
-    // 2. Update the array (add or remove postId).
-    // 3. Update the user doc in Firestore.
-    const isCurrentlySaved = savedPosts.includes(postId);
-    const newSavedPosts = isCurrentlySaved
-        ? savedPosts.filter((id) => id !== postId)
-        : [...savedPosts, postId];
-    setSavedPosts(newSavedPosts);
+    const currentUser = auth.currentUser;
+    if (!currentUser) {
+      Alert.alert("Login Required", "You need to be logged in to save events.");
+      return;
+    }
+    const userDocRef = doc(db, "users", currentUser.uid);
 
-    // --- Example Firestore Update (Uncomment and adapt if needed) ---
-    // const currentUser = auth.currentUser;
-    // if (currentUser) {
-    //   const userDocRef = doc(db, "users", currentUser.uid);
-    //   try {
-    //     await updateDoc(userDocRef, {
-    //       savedPosts: newSavedPosts // Or use arrayUnion/arrayRemove
-    //     });
-    //     console.log("Saved posts updated in Firestore.");
-    //   } catch (error) {
-    //     console.error("Error updating saved posts in Firestore:", error);
-    //     // Revert local state change on error
-    //     setSavedPosts(savedPosts);
-    //     Alert.alert("Error", "Could not update saved posts.");
-    //   }
-    // }
-    // --- End Example Firestore Update ---
+    // Check against the current state for immediate UI feedback
+    const isCurrentlySaved = savedPosts.includes(postId);
+
+    // --- Optimistic UI Update ---
+    const updatedSavedPostsLocally = isCurrentlySaved
+      ? savedPosts.filter((id) => id !== postId)
+      : [...savedPosts, postId];
+    setSavedPosts(updatedSavedPostsLocally); // Update local state first
+
+    // --- Persist change to Firestore ---
+    try {
+      console.log(`Updating Firestore savedPosts. Action: ${isCurrentlySaved ? 'Unsave' : 'Save'}, PostID: ${postId}`);
+      await updateDoc(userDocRef, {
+        // *** CONFIRM 'savedPosts' is the correct field name in Firestore ***
+        savedPosts: isCurrentlySaved
+          ? arrayRemove(postId) // Use arrayRemove to unsave
+          : arrayUnion(postId)   // Use arrayUnion to save
+      });
+      console.log("Firestore savedPosts updated successfully.");
+    } catch (error) {
+      console.error("Error updating saved posts in Firestore:", error);
+      Alert.alert("Error", `Could not ${isCurrentlySaved ? 'unsave' : 'save'} event. Please try again.`);
+      // Revert optimistic UI update on error
+      setSavedPosts(savedPosts); // Revert to the original state before the optimistic update
+    }
   };
 
 
@@ -383,6 +392,15 @@ export default function HomeScreen() {
          Alert.alert("Error", "Could not join the chat for this event.");
          setIsDetailsModalVisible(true); // Re-open modal on error if desired
     }
+  };
+
+  // Add helper function if needed
+  const savedPostsAreEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
+    if (!arr1 || !arr2) return arr1 === arr2;
+    if (arr1.length !== arr2.length) return false;
+    const sorted1 = [...arr1].sort();
+    const sorted2 = [...arr2].sort();
+    return sorted1.every((value, index) => value === sorted2[index]);
   };
 
   // --- Render Functions ---
@@ -471,7 +489,6 @@ export default function HomeScreen() {
   // This prevents rendering the main UI before auth state is known.
 
   return (
-    
     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
       <StatusBar
             backgroundColor={cardBackgroundColor}
@@ -765,7 +782,6 @@ export default function HomeScreen() {
           </Pressable>
         </Pressable>
       </Modal>
-
     </SafeAreaView>
   );
 }
