@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   Image,
+  Keyboard,
   SafeAreaView, // Use SafeAreaView from react-native-safe-area-context if installed
   KeyboardAvoidingView,
   ScrollView,
@@ -46,6 +47,7 @@ export default function ForgotPasswordScreen() {
       return;
     }
 
+    Keyboard.dismiss();
     setIsLoading(true);
     try {
       await sendPasswordResetEmail(auth, trimmedEmail);
@@ -90,10 +92,7 @@ export default function ForgotPasswordScreen() {
 
   return (
      <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-       <KeyboardAvoidingView
-         style={{ flex: 1 }}
-         behavior={Platform.OS === "ios" ? "padding" : "height"}
-       >
+       
          <ScrollView
            contentContainerStyle={styles.scrollContainer}
            keyboardShouldPersistTaps="handled"
@@ -153,7 +152,7 @@ export default function ForgotPasswordScreen() {
 
              {/* Back to Login Link */}
               <View style={styles.loginLinkContainer}>
-                 <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+                 <TouchableOpacity onPress={() => navigation.replace("Login")}>
                     <Text style={[styles.linkText, styles.linkHighlight, { color: linkColor }]}>
                       Back to Login
                     </Text>
@@ -162,7 +161,7 @@ export default function ForgotPasswordScreen() {
 
            </View>
          </ScrollView>
-       </KeyboardAvoidingView>
+       {/* </KeyboardAvoidingView> */}
      </SafeAreaView>
    );
  }
@@ -176,7 +175,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   logoContainer: {
     alignItems: 'center',

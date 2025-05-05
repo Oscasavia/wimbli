@@ -11,6 +11,7 @@ import {
   RefreshControl,
   TextInput,
   Modal,
+  StatusBar,
   Alert,
   ScrollView,
   Dimensions, // Import Dimensions
@@ -470,9 +471,14 @@ export default function HomeScreen() {
   // This prevents rendering the main UI before auth state is known.
 
   return (
+    
     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+      <StatusBar
+            backgroundColor={cardBackgroundColor}
+            barStyle={isDark ? "light-content" : "dark-content"}
+          />
       {/* Header: Search + Filter Button */}
-      <View style={styles.headerContainer}>
+      <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
         <View style={[styles.searchContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
           <Feather name="search" size={20} color={placeholderTextColor} style={styles.searchIcon} />
           <TextInput
@@ -779,7 +785,11 @@ const styles = StyleSheet.create({
     paddingBottom: 10,
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
-    // borderBottomColor: currentTheme.inputBorder // Use theme border
+    borderBottomColor: 'transparent', // Use theme border
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
   },
   searchContainer: {
     flex: 1,
@@ -835,7 +845,7 @@ const styles = StyleSheet.create({
   card: {
     padding: 15,
     borderRadius: 12,
-    marginBottom: 16,
+    marginBottom: 10,
     borderWidth: 1,
     // Dynamic background, border, shadow colors
     shadowOffset: { width: 0, height: 2 },

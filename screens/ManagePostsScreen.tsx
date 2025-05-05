@@ -6,6 +6,8 @@ import {
   StyleSheet,
   TouchableOpacity,
   Alert,
+  Platform,
+  StatusBar,
   ActivityIndicator,
 } from "react-native";
 import { db, auth } from "../firebase";
@@ -220,11 +222,18 @@ export default function ManagePostsScreen() {
 
   // --- Main List View ---
   return (
-    <SafeAreaView style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+    <SafeAreaView style={{ flex: 1 }}>
+    <StatusBar
+      backgroundColor={cardBackgroundColor}
+      // barStyle={isDark ? "light-content" : "dark-content"}
+    />
+    <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
        {/* Screen Title */}
-       <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
-          Manage Your Posts
-       </Text>
+       <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+            Manage Your Posts
+        </Text>
+       </View>
       <FlatList
         data={posts}
         renderItem={renderPost}
@@ -232,6 +241,7 @@ export default function ManagePostsScreen() {
         contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
       />
+    </View>
     </SafeAreaView>
   );
 }
@@ -241,12 +251,29 @@ const styles = StyleSheet.create({
   screen: {
     flex: 1,
   },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Use theme border
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
+  },
   screenTitle: {
     fontSize: 24,
     fontWeight: "bold",
     textAlign: "center",
-    marginVertical: 15,
-    paddingHorizontal: 20,
+    marginTop: '1.9%',
+    marginBottom: 4,
+    // paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
   listContainer: {
     paddingHorizontal: 16,

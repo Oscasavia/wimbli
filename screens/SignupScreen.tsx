@@ -7,6 +7,7 @@ import {
   Text,
   Alert,
   Image,
+  Keyboard,
   SafeAreaView, // Use the one from react-native-safe-area-context if installed, otherwise react-native
   KeyboardAvoidingView,
   ScrollView,
@@ -53,7 +54,7 @@ export default function SignupScreen() {
     const trimmedEmail = email.trim();
     const trimmedUsername = username.trim();
 
-    // Basic Validation
+    // Basic Validation (Keep existing checks)
     if (!trimmedEmail || !trimmedUsername || !password || !confirmPassword) {
         Alert.alert("Missing Information", "Please fill in all fields.");
         return;
@@ -66,16 +67,12 @@ export default function SignupScreen() {
       Alert.alert("Password Mismatch", "Passwords do not match.");
       return;
     }
-    // Optional: Add password strength validation here
 
+    Keyboard.dismiss();
     setIsLoading(true);
     try {
       // 1. Create Auth User
-      const userCred = await createUserWithEmailAndPassword(
-        auth,
-        trimmedEmail,
-        password
-      );
+      const userCred = await createUserWithEmailAndPassword( auth, trimmedEmail, password );
       const user = userCred.user;
       console.log("Auth user created:", user.uid);
 
@@ -84,35 +81,58 @@ export default function SignupScreen() {
       console.log("Auth profile updated with displayName:", trimmedUsername);
 
        // 3. Create User Document in Firestore (Important!)
-       // Store username, email, initial interests (empty), etc.
        const userDocRef = doc(db, "users", user.uid);
        await setDoc(userDocRef, {
            uid: user.uid,
            username: trimmedUsername,
            email: trimmedEmail,
            createdAt: Timestamp.now(), // Use Firestore Timestamp
-           interests: [], // Initialize interests as empty
-           profilePicture: null, // Initialize profile picture
-           bio: "", // Initialize bio
-           // Add any other default fields needed
-       });
+           interests: [],
+           profilePicture: null,
+           bio: "",
+           profileSetupCompleted: false, // Mark setup as incomplete
+       }, { merge: true }); // Use merge just in case, though setDoc usually overwrites
        console.log("Firestore user document created:", user.uid);
 
-      // 4. Navigate to next step (e.g., Interest selection or Main App)
-      navigation.replace("Interests"); // Or 'Main' if skipping interests for now
+      // 4. Navigate to next step
+      navigation.replace("Interests");
 
     } catch (error: any) {
-      console.error("Signup Error:", error);
-      let errorMessage = "Signup failed. Please try again.";
-      // Provide more specific feedback
-      if (error.code === 'auth/email-already-in-use') {
-         errorMessage = "This email address is already registered. Please try logging in.";
-      } else if (error.code === 'auth/invalid-email') {
-         errorMessage = "Please enter a valid email address.";
-      } else if (error.code === 'auth/weak-password') {
-         errorMessage = "Password is too weak. Please choose a stronger password (at least 6 characters).";
+      // --- Enhanced Logging ---
+      // console.error("--- Signup Error Details ---");
+      // console.error("Code:", error.code);        // Log the specific code
+      // console.error("Message:", error.message);  // Log the specific message
+      // console.error("Full Error:", error); // Optional full object log
+      // console.error("----------------------------");
+
+
+      // --- User Feedback (Using Switch for consistency) ---
+      let userErrorMessage = "Signup failed. Please check your details and try again."; // Default
+
+      switch(error.code) {
+          case 'auth/email-already-in-use':
+              userErrorMessage = "This email address is already registered. Please try logging in or use a different email.";
+              break;
+          case 'auth/invalid-email':
+              userErrorMessage = "Please enter a valid email address.";
+              break;
+          case 'auth/weak-password':
+              userErrorMessage = "Password is too weak. Please use at least 6 characters.";
+              break;
+          case 'auth/operation-not-allowed':
+               userErrorMessage = "Email/password sign up is not enabled. Please contact support.";
+               break;
+           case 'auth/network-request-failed':
+               userErrorMessage = "Network error. Please check your internet connection.";
+               break;
+           // Add other specific codes if needed
+           default:
+               console.log("Unhandled Firebase signup error code:", error.code);
+               // Keep a generic message for unknown errors
+               break;
       }
-      Alert.alert("Signup Failed", errorMessage);
+
+      Alert.alert("Signup Failed", userErrorMessage);
     } finally {
       setIsLoading(false);
     }
@@ -120,11 +140,7 @@ export default function SignupScreen() {
 
   return (
      <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-       <KeyboardAvoidingView
-         style={{ flex: 1 }}
-         behavior={Platform.OS === "ios" ? "padding" : "height"}
-         keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0}
-       >
+      
          <ScrollView
            contentContainerStyle={styles.scrollContainer}
            keyboardShouldPersistTaps="handled"
@@ -281,7 +297,7 @@ export default function SignupScreen() {
 
            </View>
          </ScrollView>
-       </KeyboardAvoidingView>
+       {/* </KeyboardAvoidingView> */}
      </SafeAreaView>
    );
  }
@@ -295,7 +311,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 20,
+    padding: 16,
   },
   logoContainer: {
     alignItems: 'center',

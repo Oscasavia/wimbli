@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Image,
+  Keyboard,
   Platform,
   KeyboardAvoidingView, // Added
   ScrollView, // Added
@@ -47,46 +48,68 @@ export default function LoginScreen() {
         Alert.alert("Missing Info", "Please enter both email and password.");
         return;
     }
+
+    Keyboard.dismiss();
     setIsLoading(true);
     try {
       await signInWithEmailAndPassword(auth, email.trim(), password); // Trim email
       // TODO: Verify if removing "Interests" here is still necessary.
-      // This seems like leftover logic from an onboarding flow perhaps?
-      // Consider removing if it's not related to login.
       await AsyncStorage.removeItem("Interests");
       console.log("Login successful");
 
-      // Reset navigation to the main authenticated stack
-      // Ensure 'Main' is the correct name of your Tab Navigator or authenticated stack root
       navigation.reset({
           index: 0,
-          routes: [{ name: 'Main' }],
+          routes: [{ name: 'Main' }], // Ensure 'Main' is correct
       });
 
     } catch (error: any) {
-       console.error("Login Error:", error);
-      // Provide more user-friendly messages for common errors
-      let errorMessage = "Login failed. Please check your credentials.";
-      if (error.code === 'auth/user-not-found' || error.code === 'auth/wrong-password' || error.code === 'auth/invalid-credential') {
-        errorMessage = "Invalid email or password.";
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = "Please enter a valid email address.";
-      } else if (error.code === 'auth/too-many-requests') {
-         errorMessage = "Access temporarily disabled due to too many attempts. Please try again later.";
+      // --- Enhanced Logging ---
+      // console.error("--- Login Error Details ---");
+      // console.error("Code:", error.code);       // Log the specific code
+      // console.error("Message:", error.message); // Log the Firebase message
+      // console.error("Full Error:", error); // Keep this commented unless needed for deeper dive
+      // console.error("---------------------------");
+
+      // --- Improved User Feedback ---
+      let userErrorMessage = "Login failed. Please check your credentials and try again."; // Default user message
+
+      // Use switch for cleaner handling of specific codes
+      switch (error.code) {
+        case 'auth/invalid-credential':
+        // This code often covers user-not-found and wrong-password implicitly now
+        // case 'auth/user-not-found': // Can often be removed as invalid-credential covers it
+        // case 'auth/wrong-password': // Can often be removed as invalid-credential covers it
+          userErrorMessage = "Invalid email or password.";
+          break;
+        case 'auth/invalid-email':
+          userErrorMessage = "Please enter a valid email address.";
+          break;
+        case 'auth/too-many-requests':
+          userErrorMessage = "Access temporarily disabled due to too many login attempts. Please reset your password or try again later.";
+          break;
+        case 'auth/network-request-failed':
+           userErrorMessage = "Network error. Please check your internet connection and try again.";
+           break;
+        case 'auth/user-disabled':
+            userErrorMessage = "This user account has been disabled.";
+            break;
+        // Add any other specific codes you want to handle
+        default:
+             // You could use the Firebase message for unhandled errors, but keep it generic for security
+             console.log("Unhandled Firebase login error code:", error.code); // Log unhandled codes
+             // Keep the generic message for the user:
+             // userErrorMessage = "An unexpected error occurred. Please try again.";
+             break;
       }
-      Alert.alert("Login Failed", errorMessage);
+
+      Alert.alert("Login Failed", userErrorMessage);
       setIsLoading(false); // Ensure loading stops on error
     }
-    // No finally block needed if navigation happens on success
   };
 
   return (
     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={Platform.OS === "ios" ? 0 : 0} // Adjust as needed
-      >
+      
         <ScrollView
           contentContainerStyle={styles.scrollContainer}
           keyboardShouldPersistTaps="handled"
@@ -146,7 +169,7 @@ export default function LoginScreen() {
             </View>
 
             {/* Forgot Password Link */}
-            <TouchableOpacity style={styles.forgotPasswordButton} onPress={() => navigation.navigate("ForgotPassword")}>
+            <TouchableOpacity style={styles.forgotPasswordButton} onPress={() => navigation.replace("ForgotPassword")}>
               <Text style={[styles.linkText, styles.linkHighlight, { color: linkColor }]}>Forgot password?</Text>
             </TouchableOpacity>
 
@@ -173,7 +196,7 @@ export default function LoginScreen() {
                 <Text style={[styles.linkText, { color: currentTheme.textSecondary }]}>
                   Don't have an account?{' '}
                 </Text>
-                <TouchableOpacity onPress={() => navigation.navigate("Signup")}>
+                <TouchableOpacity onPress={() => navigation.replace("Signup")}>
                    <Text style={[styles.linkText, styles.linkHighlight, { color: linkColor }]}>
                      Sign up
                    </Text>
@@ -182,7 +205,7 @@ export default function LoginScreen() {
 
           </View>
         </ScrollView>
-      </KeyboardAvoidingView>
+      {/* </KeyboardAvoidingView> */}
     </SafeAreaView>
   );
 }
@@ -196,7 +219,7 @@ const styles = StyleSheet.create({
     flexGrow: 1, // Ensure content can grow to center vertically
     justifyContent: 'center', // Center content vertically
     alignItems: 'center', // Center content horizontally
-    padding: 20, // Padding around the content
+    padding: 16, // Padding around the content
   },
   logoContainer: {
     alignItems: 'center',

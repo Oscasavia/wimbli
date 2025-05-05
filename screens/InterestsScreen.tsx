@@ -5,41 +5,42 @@ import {
   TouchableOpacity,
   StyleSheet,
   FlatList,
-  TouchableOpacity as ButtonOpacity,
   Alert,
+  SafeAreaView, // Use SafeAreaView
+  ActivityIndicator, // Added for loading
+  Platform,
 } from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { doc, setDoc } from "firebase/firestore";
-import { db, auth } from "../firebase";
+import { db, auth } from "../firebase"; // Adjust path if needed
+import { useTheme } from "../ThemeContext"; // Adjust path if needed
+import { lightTheme, darkTheme } from "../themeColors"; // Adjust path if needed
+import { Feather } from "@expo/vector-icons"; // Added for icons
+
+// Removed LinearGradient if it was implicitly assumed
 
 const INTEREST_OPTIONS = [
-  "Poetry",
-  "Tennis",
-  "Coding",
-  "Volunteering",
-  "Live Music",
-  "Book Clubs",
-  "Photography",
-  "Dancing",
-  "Spirituality",
-  "Outdoor Events",
-  "Art",
-  "Sports",
-  "Games",
-  "Electronics",
-  "Automotive",
-  "Garden",
-  "Academics",
-  "Medical",
-  "Beauty",
-  "Pet",
-  "Food",
-  "Clothes",
+    "Poetry", "Tennis", "Coding", "Volunteering", "Live Music", "Book Clubs",
+    "Photography", "Dancing", "Spirituality", "Outdoor Events", "Art", "Sports",
+    "Games", "Electronics", "Automotive", "Garden", "Academics", "Medical",
+    "Beauty", "Pet", "Food", "Clothes",
 ];
 
 export default function InterestsScreen() {
   const [selected, setSelected] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(false); // Loading state
   const navigation = useNavigation<any>();
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const currentTheme = isDark ? darkTheme : lightTheme;
+
+  // --- Theme variable fallbacks ---
+  const chipBackgroundColor = currentTheme.chipBackground || (isDark ? '#3a3a3c' : '#e5e5e5');
+  const chipBorderColor = currentTheme.inputBorder || (isDark ? '#555' : '#ccc');
+  const chipTextColor = currentTheme.textSecondary || (isDark ? '#ccc' : '#555');
+  const selectedChipBgColor = currentTheme.primary || '#007AFF';
+  const selectedChipTextColor = currentTheme.buttonText || '#ffffff';
+  const shadowColor = currentTheme.shadowColor || '#000';
 
   const toggleInterest = (interest: string) => {
     setSelected((prev) =>
@@ -49,145 +50,197 @@ export default function InterestsScreen() {
     );
   };
 
-  const saveInterests = async () => {
+  // Generic handler for finishing this step
+  const handleCompletion = async (interestsToSave: string[]) => {
+    if (isLoading) return; // Prevent double taps
+    setIsLoading(true);
     try {
       const userId = auth.currentUser?.uid;
-      if (!userId) return;
+      if (!userId) {
+          Alert.alert("Error", "User not found. Please try logging in again.");
+          setIsLoading(false); // Reset loading on error
+          // Optionally navigate to login
+          // navigation.reset({ index: 0, routes: [{ name: 'Login' }] });
+          return;
+      }
 
+      console.log(`Saving interests for ${userId}:`, interestsToSave);
       await setDoc(
         doc(db, "users", userId),
-        {
-          interests: selected,
-        },
-        { merge: true }
+        { interests: interestsToSave }, // Save selected or empty array
+        { merge: true } // Merge ensures other user data isn't overwritten
       );
 
-      navigation.replace("Main");
+      // Navigate to the main app stack, resetting history
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }], // Ensure 'Main' is your authenticated stack name
+      });
+      // No need to setLoading(false) on success due to navigation reset
+
     } catch (error: any) {
-      Alert.alert("Error saving interests", error.message);
+      console.error("Error saving/skipping interests:", error);
+      Alert.alert("Error", `Could not save preferences: ${error.message}`);
+      setIsLoading(false); // Reset loading on error
     }
   };
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Select Your Interests</Text>
-      <FlatList
-        data={INTEREST_OPTIONS}
-        numColumns={2}
-        keyExtractor={(item) => item}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={[
-              styles.chip,
-              selected.includes(item) && styles.selectedChip,
-            ]}
-            onPress={() => toggleInterest(item)}
-          >
-            <Text
-              style={[
-                styles.chipText,
-                selected.includes(item) && styles.selectedChipText,
-              ]}
-            >
-              {item}
-            </Text>
-          </TouchableOpacity>
-        )}
-      />
-      <ButtonOpacity
-        style={[
-          styles.continueButton,
-          selected.length === 0 && styles.disabledButton,
-        ]}
-        onPress={saveInterests}
-        disabled={selected.length === 0}
-      >
-        <Text style={styles.continueButtonText}>Continue</Text>
-      </ButtonOpacity>
+  const renderInterestChip = ({ item }: { item: string }) => {
+    const isSelected = selected.includes(item);
+    return (
       <TouchableOpacity
-        onPress={async () => {
-          try {
-            const userId = auth.currentUser?.uid;
-            if (!userId) return;
-
-            await setDoc(
-              doc(db, "users", userId),
-              {
-                interests: [],
-              },
-              { merge: true }
-            );
-
-            navigation.replace("Main");
-          } catch (error: any) {
-            Alert.alert("Error skipping interests", error.message);
-          }
-        }}
+        style={[
+          styles.chipContainer,
+          {
+            backgroundColor: isSelected ? selectedChipBgColor : chipBackgroundColor,
+            borderColor: isSelected ? selectedChipBgColor : chipBorderColor,
+          },
+        ]}
+        onPress={() => toggleInterest(item)}
+        activeOpacity={0.7}
       >
-        <Text style={styles.skip}>Skip for now</Text>
+         {isSelected && <Feather name="check" size={16} color={selectedChipTextColor} style={styles.chipIcon} />}
+        <Text
+          style={[
+            styles.chipText,
+            { color: isSelected ? selectedChipTextColor : chipTextColor },
+          ]}
+        >
+          {item}
+        </Text>
       </TouchableOpacity>
-    </View>
+    );
+  };
+
+  return (
+     // Use SafeAreaView for top/bottom padding
+    <SafeAreaView style={[styles.safeAreaContainer, { backgroundColor: currentTheme.background }]}>
+        <View style={styles.container}>
+            <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Select Your Interests</Text>
+            <Text style={[styles.subtitle, { color: currentTheme.textSecondary }]}>Choose a few things you like. This helps us find relevant events for you.</Text>
+
+            <FlatList
+                data={INTEREST_OPTIONS}
+                renderItem={renderInterestChip}
+                keyExtractor={(item) => item}
+                numColumns={2} // Keep 2 columns
+                contentContainerStyle={styles.listContainer}
+                showsVerticalScrollIndicator={false}
+            />
+
+             {/* Continue Button */}
+            <TouchableOpacity
+                style={[
+                styles.continueButton,
+                { backgroundColor: currentTheme.primary },
+                (selected.length === 0 || isLoading) && styles.disabledButton, // Disable visually
+                ]}
+                onPress={() => handleCompletion(selected)}
+                disabled={selected.length === 0 || isLoading} // Disable functionally
+                activeOpacity={0.8}
+            >
+                 {isLoading ? (
+                     <ActivityIndicator size="small" color={currentTheme.buttonText || '#fff'} />
+                 ) : (
+                    <Text style={[styles.continueButtonText, { color: currentTheme.buttonText || '#fff' }]}>Continue</Text>
+                 )}
+            </TouchableOpacity>
+
+             {/* Skip Link/Button */}
+            <TouchableOpacity
+                style={styles.skipButton}
+                onPress={() => handleCompletion([])} // Save empty array on skip
+                disabled={isLoading} // Disable if already saving/skipping
+            >
+                <Text style={[styles.skipText, { color: currentTheme.textSecondary }]}>Skip for now</Text>
+            </TouchableOpacity>
+        </View>
+    </SafeAreaView>
   );
 }
 
+// --- Styles ---
 const styles = StyleSheet.create({
+  safeAreaContainer: {
+    flex: 1,
+  },
   container: {
     flex: 1,
-    padding: 30,
-    backgroundColor: "#E0F7FA",
+    paddingHorizontal: 20, // Horizontal padding for content
+    paddingTop: 40, // Space from top safe area
+    paddingBottom: 15, // Space from bottom safe area
   },
   title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    textAlign: "center",
-    marginVertical: 30,
-    color: "#00796B",
+    fontSize: 26, // Adjusted size
+    fontWeight: 'bold',
+    textAlign: 'center',
+    marginBottom: 10, // Less margin below title
+    // color set dynamically
   },
-  chip: {
-    flex: 1,
-    backgroundColor: "#F5F5F5",
-    borderWidth: 1,
-    borderColor: "#BDBDBD",
-    margin: 8,
-    paddingVertical: 12,
-    borderRadius: 25,
-    alignItems: "center",
+  subtitle: {
+     fontSize: 16,
+     textAlign: 'center',
+     marginBottom: 25, // Space below subtitle
+     lineHeight: 22,
+     // color set dynamically
   },
-  selectedChip: {
-    backgroundColor: "#FF7043",
-    borderColor: "#FF7043",
+  listContainer: {
+     paddingBottom: 10, // Space below the grid
+  },
+  chipContainer: {
+    flex: 1, // Distribute space evenly in columns
+    flexDirection: 'row', // For icon + text
+    alignItems: 'center',
+    justifyContent: 'center', // Center content within chip
+    borderWidth: 1.5, // Slightly thicker border
+    margin: 6, // Adjust spacing between chips
+    paddingVertical: 10, // Adjust padding
+    paddingHorizontal: 12,
+    borderRadius: 20, // Rounded chips
+    // Dynamic backgroundColor, borderColor
+  },
+  // selectedChipContainer: { // Combined into conditional style
+  // },
+  chipIcon: {
+     marginRight: 6, // Space between check and text
   },
   chipText: {
-    color: "#424242",
-    fontSize: 16,
+    fontSize: 14, // Adjust font size
+    fontWeight: '500',
+    // Dynamic color
   },
-  selectedChipText: {
-    color: "white",
-  },
+  // selectedChipText: { // Combined into conditional style
+  // },
   continueButton: {
-    backgroundColor: "#00ACC1",
-    paddingVertical: 15,
-    borderRadius: 10,
-    alignItems: "center",
-    marginTop: 30,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
-    elevation: 2,
+    paddingVertical: 14,
+    borderRadius: 25, // Consistent rounded button
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 20, // Space above button
+    minHeight: 48, // Ensure consistent button height even with loader
+    // Dynamic backgroundColor
+    // Shadow (optional)
+     shadowColor: "#000", // Use shadowColor variable
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.15,
+     shadowRadius: 4,
+     elevation: 3,
   },
   continueButtonText: {
-    color: "white",
     fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: 'bold',
+    // Dynamic color
   },
   disabledButton: {
-    opacity: 0.5,
+    opacity: 0.6, // More pronounced disabled state
   },
-  skip: {
-    marginTop: 25,
-    color: "#757575",
-    textAlign: "center",
-    fontSize: 16,
+  skipButton: {
+      marginTop: 15, // Space above skip
+      padding: 10, // Easier to tap
+  },
+  skipText: {
+    textAlign: 'center',
+    fontSize: 15,
+    // Dynamic color
   },
 });

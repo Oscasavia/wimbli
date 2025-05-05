@@ -458,8 +458,8 @@ const styles = StyleSheet.create({
   },
    placeholderText: {
     fontSize: 15,
-    fontStyle: 'italic',
-    textAlign: 'center',
+    // fontStyle: 'italic',
+    // textAlign: 'center',
     marginTop: 10,
   },
   linkText: {

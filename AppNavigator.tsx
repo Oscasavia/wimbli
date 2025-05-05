@@ -51,7 +51,7 @@ export default function AppNavigator() { // Or AppTabs
           // borderTopRightRadius: 15, // Add rounding
           // borderTopLeftRadius: 15,
           backgroundColor: barBackgroundColor,
-          borderTopWidth: 1, // Use border instead of just shadow sometimes
+          // borderTopWidth: 1, // Use border instead of just shadow sometimes
           borderTopColor: topBorderColor,
           // Shadow (adjust as needed)
           shadowColor: shadowColor,

@@ -59,6 +59,7 @@ export default function PostScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
   const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
   const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
@@ -182,26 +183,49 @@ export default function PostScreen() {
   };
 
   // --- Date/Time Picker Logic (Android Specific) ---
-  const showDateTimePicker = (mode: 'date' | 'time') => {
+  const showDateTimePicker = (mode: 'date' | 'time', dateFromDatepicker?: Date) => {
+    // Use the date selected from the date picker if provided, otherwise use current state
+    const currentDateValue = dateFromDatepicker || date;
+
     DateTimePickerAndroid.open({
-      value: date,
+      value: currentDateValue, // Use the potentially updated date
       onChange: (event, selectedValue) => {
+        // Check if a value was actually selected ('set' event)
         if (event.type === 'set' && selectedValue) {
-          const newDate = new Date(selectedValue);
+          const selectedDateOrTime = new Date(selectedValue);
+
           if (mode === 'date') {
-             // If only date is picked, show time picker next
-             setDate(newDate); // Update date part first
-             showDateTimePicker('time'); // Then show time picker
+            // User just picked a DATE.
+            // The selectedValue contains the correct date, but potentially wrong time (often midnight UTC or current time)
+            console.log("Date selected (raw):", selectedDateOrTime);
+            // IMPORTANT: Don't set the state here yet.
+            // Call the time picker, passing the DATE the user just selected.
+            showDateTimePicker('time', selectedDateOrTime); // Pass the selected date object
+
           } else {
-             // If time is picked, finalize the date
-             setDate(newDate);
+            // User just picked a TIME.
+            // `currentDateValue` here holds the date the user picked in the previous step.
+            // `selectedDateOrTime` holds the time the user picked (date part might be wrong).
+            console.log("Time selected (raw):", selectedDateOrTime);
+
+            // Combine the DATE from the first step and the TIME from the second step
+            const finalDate = new Date(currentDateValue); // Start with the correct date
+            finalDate.setHours(selectedDateOrTime.getHours()); // Apply selected hours
+            finalDate.setMinutes(selectedDateOrTime.getMinutes()); // Apply selected minutes
+            finalDate.setSeconds(0); // Optional: Reset seconds
+            finalDate.setMilliseconds(0); // Optional: Reset milliseconds
+
+            console.log("Final combined date:", finalDate);
+            setDate(finalDate); // Update the state with the CORRECT combined date and time
           }
+        } else {
+           console.log(`Picker ${mode} dismissed or no value set.`);
+           // Handle dismissal - maybe do nothing or show a message
         }
-        // Handle 'dismissed' event if necessary
       },
       mode: mode,
-      is24Hour: true, // Use 24-hour format
-      minimumDate: new Date(), // Prevent selecting past dates/times
+      is24Hour: true, // Or false based on preference
+      minimumDate: new Date(), // Ensure users can't select past dates/times
     });
   };
 
@@ -212,10 +236,12 @@ export default function PostScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined} // Use "height" if padding doesn't work well
         keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0} // Adjust offset as needed
       >
+        <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
          {/* Screen Title */}
          <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
             {editPost ? "Edit Event Post" : "Create New Event Post"}
          </Text>
+        </View>
 
         <ScrollView
            contentContainerStyle={styles.scrollContainer}
@@ -248,7 +274,7 @@ export default function PostScreen() {
            {/* Location Input */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Location</Text>
            <TextInput
-             placeholder="e.g., Millennium Park, Chicago or Online"
+             placeholder="e.g., Millennium Park, Online"
              value={location}
              onChangeText={setLocation}
              style={[styles.input, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
@@ -277,7 +303,7 @@ export default function PostScreen() {
            {/* Fee Input */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Fee ($)</Text>
            <TextInput
-             placeholder="Enter amount (e.g., 10.50) or leave blank for free"
+             placeholder="e.g., 10.50 (or leave blank for free)"
              value={fee}
              onChangeText={setFee}
              keyboardType="decimal-pad" // Use decimal pad for currency
@@ -339,6 +365,21 @@ const styles = StyleSheet.create({
   keyboardAvoidingContainer: {
     flex: 1,
   },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Use theme border
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 5,
+    elevation: 3,
+  },
   scrollContainer: {
     paddingHorizontal: 20,
     paddingTop: 10, // Reduced top padding as title is outside scroll
@@ -350,6 +391,8 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginVertical: 15, // Add vertical margin for spacing
     paddingHorizontal: 20, // Ensure padding if text wraps
+    marginTop: '1.9%',
+    marginBottom: 4,
   },
   label: {
     fontSize: 16,

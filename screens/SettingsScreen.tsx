@@ -107,7 +107,11 @@ export default function SettingsScreen() {
 
        Alert.alert("Account Deleted", "Your account has been successfully deleted.");
        // Navigation likely handled by root navigator listening to auth state change
-       // navigation.replace("Signup");
+      // Navigate to Signup screen directly
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Signup" }],
+      });
 
     } catch (error: any) {
        console.error("Delete Account Error:", error);
@@ -142,7 +146,7 @@ export default function SettingsScreen() {
         isLastInSection && styles.lastRow,
         !isLastInSection && { borderBottomColor: separatorColor, borderBottomWidth: StyleSheet.hairlineWidth },
         // Add shadow styles if desired for card look
-        // styles.cardShadow, { shadowColor }
+        styles.cardShadow, { shadowColor }
     ];
     const content = (
         <View style={rowStyles}>
@@ -348,12 +352,12 @@ const styles = StyleSheet.create({
      borderBottomRightRadius: 12,
       borderBottomWidth: 0, // No bottom border on the last item
    },
-   // cardShadow: { // Optional shadow for card look
-   //    shadowOffset: { width: 0, height: 1 },
-   //    shadowOpacity: 0.05,
-   //    shadowRadius: 2,
-   //    elevation: 1,
-   // },
+   cardShadow: { // Optional shadow for card look
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+   },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -79,7 +79,7 @@ const SplashScreen = () => {
           animation="pulse" // Choose animation: pulse, bounceIn, fadeIn, etc.
           easing="ease-in-out" // Animation easing
           iterationCount="infinite" // Loop 'pulse', use 1 for 'bounceIn'/'fadeIn'
-          duration={1200} // Animation duration per cycle
+          duration={3000} // Animation duration per cycle
        >
          <Image
            source={require("../assets/wimbli-icon-bg.png")} // Ensure path is correct
