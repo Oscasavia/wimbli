@@ -42,26 +42,21 @@ export default function AppNavigator() { // Or AppTabs
         headerShown: false, // Keep headers managed by individual screens or stack navigators
         tabBarShowLabel: true, // **Enable labels**
         tabBarStyle: {
-          // --- Style the Tab Bar ---
-          // position: 'absolute', // Keep floating style if desired
-          // bottom: Platform.OS === 'ios' ? 20 : 15, // Adjust vertical position
-          // left: 15,
-          // right: 15,
           height: Platform.OS === 'ios' ? 60 : 55, // Adjust height (consider labels)
-          // borderTopRightRadius: 15, // Add rounding
-          // borderTopLeftRadius: 15,
           backgroundColor: barBackgroundColor,
-          // borderTopWidth: 1, // Use border instead of just shadow sometimes
-          borderTopColor: topBorderColor,
+          borderTopColor: "transparent",
           // Shadow (adjust as needed)
-          shadowColor: shadowColor,
-          shadowOffset: {
-            width: 0,
-            height: -2, // Shadow upwards for bottom bar
-          },
-          shadowOpacity: 0.1,
-          shadowRadius: 4,
-          elevation: 5,
+          ...Platform.select({
+            ios: {
+              shadowColor: shadowColor,
+              shadowOffset: { width: 0, height: -3 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+            },
+            android: {
+              elevation: 10, // Stronger elevation for Android
+            },
+          }),
         },
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,

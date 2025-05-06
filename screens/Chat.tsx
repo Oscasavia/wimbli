@@ -95,6 +95,7 @@ export default function Chat() {
   const lastTapTimeRef = useRef(0); // Ref for double-tap timing
 
   // --- Theme variable fallbacks ---
+  const cardBackgroundColor = currentTheme.cardBackground || (currentTheme ? "#1c1c1e" : "#ffffff");
   const bubbleSenderBg = currentTheme.primary || '#007AFF';
   const bubbleReceiverBg = currentTheme.inputBackground || (theme === 'dark' ? '#2c2c2e' : '#f0f0f0');
   const textSenderColor = currentTheme.buttonText || '#ffffff';
@@ -562,7 +563,7 @@ const styles = StyleSheet.create({
        alignItems: 'center',
        paddingVertical: 8,
        paddingHorizontal: 15,
-       borderTopWidth: 1,
+       borderTopWidth: 0,
        // backgroundColor, borderTopColor set dynamically
    },
    replyPreviewTextContainer: {
@@ -585,9 +586,9 @@ const styles = StyleSheet.create({
    // --- Input Area Styles ---
    inputAreaContainer: {
        flexDirection: 'row',
-       paddingVertical: 8,
+       paddingVertical: 10,
        paddingHorizontal: 10,
-       borderTopWidth: StyleSheet.hairlineWidth,
+      //  borderTopWidth: StyleSheet.hairlineWidth,
        alignItems: 'center', // Align input and button vertically
        // borderTopColor set dynamically
    },
@@ -595,15 +596,15 @@ const styles = StyleSheet.create({
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
-      borderRadius: 22, // Rounder input container
-      borderWidth: 1,
+      borderRadius: 25, // Rounder input container
+      borderWidth: 0,
       paddingHorizontal: 12,
       marginRight: 8,
       // backgroundColor, borderColor set dynamically
    },
    textInput: {
        flex: 1,
-       paddingVertical: Platform.OS === 'ios' ? 10 : 8, // Adjust padding per platform
+       paddingVertical: Platform.OS === 'ios' ? 14 : 12, // Adjust padding per platform
        fontSize: 16,
        maxHeight: 100, // Limit height for multiline
        // color set dynamically

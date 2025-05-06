@@ -206,10 +206,17 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     padding: 25,
     // backgroundColor set dynamically
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 5,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   title: {
     fontSize: 24,
@@ -228,15 +235,27 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderWidth: 1,
-    borderRadius: 10,
+    borderWidth: 0,
+    borderRadius: 25,
     paddingHorizontal: 12,
     marginBottom: 25, // More space below input
     height: 50,
     // backgroundColor, borderColor set dynamically
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 2,
+      },
+    }),
   },
   inputIcon: {
     marginRight: 10,
+    marginLeft: 8,
   },
   textInput: {
     flex: 1,
@@ -251,6 +270,17 @@ const styles = StyleSheet.create({
     marginTop: 10, // Space above button
     marginBottom: 25, // Space below button
     // Dynamic background color
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   resetButtonDisabled: {
      opacity: 0.7,

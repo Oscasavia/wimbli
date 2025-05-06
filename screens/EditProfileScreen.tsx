@@ -163,15 +163,13 @@ export default function EditProfileScreen() { // Removed { navigation } prop if 
 
     // If a new image was picked (local URI exists)
     if (profilePictureUri && profilePictureUri !== profilePictureUrl) {
-        const uploadedUrl = await uploadImage(profilePictureUri);
+        const uploadedUrl = await uploadImage(profilePictureUri); // AWAIT the upload
         if (uploadedUrl) {
             finalProfilePictureUrl = uploadedUrl; // Update to the new Storage URL
         } else {
-            // Handle upload failure - maybe don't save profile picture change
-            console.log("Image upload failed, proceeding without picture update.");
-            // Decide if you want to stop the whole save or just skip the picture
-            // For now, we'll proceed but use the old URL (or null)
-            finalProfilePictureUrl = profilePictureUrl; // Revert to the previously loaded URL
+            // Handle upload failure -  proceed without picture update and show message
+            Alert.alert("Upload Error", "Failed to upload profile picture. Profile will be updated without it.");
+            finalProfilePictureUrl = profilePictureUrl; // Keep the old URL
         }
     }
 
@@ -182,13 +180,13 @@ export default function EditProfileScreen() { // Removed { navigation } prop if 
             authUpdates.displayName = username;
         }
         if (finalProfilePictureUrl !== currentUser.photoURL) {
-             // Be cautious updating photoURL in Auth if using it directly elsewhere
-             // Sometimes it's better to only rely on the Firestore URL
-             authUpdates.photoURL = finalProfilePictureUrl;
+            // Be cautious updating photoURL in Auth if using it directly elsewhere
+            // Sometimes it's better to only rely on the Firestore URL
+            authUpdates.photoURL = finalProfilePictureUrl;
         }
 
         if (Object.keys(authUpdates).length > 0) {
-             await updateProfile(currentUser, authUpdates);
+            await updateProfile(currentUser, authUpdates);
         }
 
         // --- Update Firestore User Document ---
@@ -197,7 +195,7 @@ export default function EditProfileScreen() { // Removed { navigation } prop if 
             username: username,
             bio: bio,
             interests: interests,
-            profilePicture: finalProfilePictureUrl, // Save the final URL
+            profilePicture: finalProfilePictureUrl, // Save the *final* URL
             // email: email, // Save email if editing
             updatedAt: new Date(), // Good practice to track updates
         };
@@ -211,11 +209,11 @@ export default function EditProfileScreen() { // Removed { navigation } prop if 
         navigation.goBack(); // Go back to the profile screen
 
     } catch (error: any) {
-      console.error("Error saving profile:", error);
-      Alert.alert("Error", `Failed to update profile: ${error.message}`);
+        console.error("Error saving profile:", error);
+        Alert.alert("Error", `Failed to update profile: ${error.message}`);
     } finally {
-      setIsSaving(false);
-      setProfilePictureUri(null); // Clear local picker URI after save attempt
+        setIsSaving(false);
+        setProfilePictureUri(null); // Clear local URI after save
     }
   };
 

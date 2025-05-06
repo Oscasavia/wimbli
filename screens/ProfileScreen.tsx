@@ -155,7 +155,7 @@ export default function ProfileScreen() {
           onPress={toggleSettingsMenu}
         >
           <Feather
-            name="more-vertical"
+            name="chevron-down"
             size={28} // Slightly larger icon
             color={currentTheme.textPrimary}
           />
@@ -368,7 +368,7 @@ const styles = StyleSheet.create({
   },
   profileHeader: {
     alignItems: "center",
-    marginTop: 20, // Space below settings icon
+    marginTop: 10, // Space below settings icon
     marginBottom: 20,
     width: '100%',
   },
@@ -534,9 +534,9 @@ const styles = StyleSheet.create({
   },
   settingsMenuContainer: {
     position: "absolute",
-    top: 60, // Adjust based on SafeAreaView and icon position
+    top: 50, // Adjust based on SafeAreaView and icon position
     right: 20,
-    width: 200, // Wider menu
+    width: 180, // Wider menu
     borderRadius: 10, // More rounded corners
     borderWidth: StyleSheet.hairlineWidth, // Thinner border
     // Background and border color set dynamically

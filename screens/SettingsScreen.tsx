@@ -6,6 +6,7 @@ import {
   Switch,
   TouchableOpacity,
   Alert,
+  StatusBar,
   ScrollView, // Added ScrollView
   Platform, // Added Platform
   ActivityIndicator, // Added for delete/logout potentially
@@ -33,6 +34,7 @@ export default function SettingsScreen() {
 
   // --- Theme variable fallbacks ---
   const separatorColor = currentTheme.separator || (isDark ? '#3a3a3c' : '#e0e0e0');
+  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
   const cardBackgroundColor = currentTheme.cardBackground || (isDark ? '#1c1c1e' : '#ffffff');
   const errorColor = currentTheme.error || '#FF3B30';
   const shadowColor = currentTheme.shadowColor || '#000'; // If using shadows
@@ -169,9 +171,19 @@ export default function SettingsScreen() {
   // --- Main Component Return ---
   return (
     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-      {/* Removed custom title, using navigation header */}
-      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+      <StatusBar
+        translucent={false}
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
+      {/* Screen Title */}
+      <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+            Settings
+        </Text>
+      </View>
 
+      <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
         {/* == Section: Appearance == */}
         <View style={styles.section}>
            <Text style={[styles.sectionHeader, { color: currentTheme.textSecondary }]}>Appearance</Text>
@@ -315,6 +327,38 @@ export default function SettingsScreen() {
 const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Use theme border
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: '1.9%',
+    marginBottom: 4,
+    // paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
   scrollContainer: {
     paddingHorizontal: 16,

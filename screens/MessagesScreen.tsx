@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from "react"; // Added useCallback
+import React, { useEffect, useState, useCallback, } from "react"; // Added useCallback
 import {
   View,
   Text,
@@ -24,7 +24,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native"; // Use hook
+import { useNavigation, useFocusEffect } from "@react-navigation/native"; // Use hook
 // Removed LinearGradient, FontAwesome, useFocusEffect, useRef
 
 type Group = {
@@ -158,6 +158,15 @@ export default function MessagesScreen() {
     };
   }, []); // Run only on mount (or user change if auth logic was outside)
 
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
+      if (Platform.OS === "android") {
+        StatusBar.setBackgroundColor(cardBackgroundColor, true);
+      }
+    }, [isDark, cardBackgroundColor])
+  );
+
   // Client-side search filtering
   const filteredGroups = groups.filter((group) =>
     group.title.toLowerCase().includes(search.toLowerCase())
@@ -256,8 +265,10 @@ export default function MessagesScreen() {
 
   // --- Render Component ---
   return (
-    <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+    <SafeAreaView style={[styles.screenContainer, { backgroundColor: inputBackgroundColor }]}>
+    {/* <> */}
       <StatusBar
+        translucent={false}
         backgroundColor={cardBackgroundColor}
         barStyle={isDark ? "light-content" : "dark-content"}
       />
@@ -326,10 +337,18 @@ const styles = StyleSheet.create({
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
     borderBottomColor: 'transparent', // Use theme border
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   pageTitle: {
     fontSize: 24, // Slightly larger title
@@ -342,18 +361,18 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 25,
     paddingHorizontal: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 44, // Consistent height
     // Dynamic background and border color
   },
   searchBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 10,
+    borderRadius: 25,
     paddingHorizontal: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 42, // Slightly smaller search bar
   },
   searchIcon: {

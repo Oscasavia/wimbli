@@ -20,7 +20,7 @@ import {
   where,
   Timestamp, // Import Timestamp for date handling
 } from "firebase/firestore";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -91,6 +91,15 @@ export default function ManagePostsScreen() {
     // Cleanup listener on unmount
     return () => unsubscribe();
   }, []); // Empty dependency array ensures this runs once on mount
+
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
+      if (Platform.OS === "android") {
+        StatusBar.setBackgroundColor(cardBackgroundColor, true);
+      }
+    }, [isDark, cardBackgroundColor])
+  );
 
   const confirmDelete = (id: string) => {
     Alert.alert(
@@ -175,11 +184,11 @@ export default function ManagePostsScreen() {
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.buttonBase, styles.deleteButton, { borderColor: errorColor }]}
+              style={[styles.buttonBase, styles.deleteButton, { backgroundColor: errorColor }]}
               onPress={() => confirmDelete(item.id)}
             >
-               <Feather name="trash-2" size={16} color={errorColor} style={styles.buttonIcon} />
-              <Text style={[styles.buttonText, { color: errorColor }]}>Delete</Text>
+               <Feather name="trash-2" size={16} color={currentTheme.buttonText || '#fff'} style={styles.buttonIcon} />
+              <Text style={[styles.buttonText, { color: currentTheme.buttonText || '#fff' }]}>Delete</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -224,8 +233,9 @@ export default function ManagePostsScreen() {
   return (
     <SafeAreaView style={{ flex: 1 }}>
     <StatusBar
+      translucent={false}
       backgroundColor={cardBackgroundColor}
-      // barStyle={isDark ? "light-content" : "dark-content"}
+      barStyle={isDark ? "light-content" : "dark-content"}
     />
     <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
        {/* Screen Title */}
@@ -261,10 +271,18 @@ const styles = StyleSheet.create({
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
     borderBottomColor: 'transparent', // Use theme border
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   screenTitle: {
     fontSize: 24,
@@ -276,8 +294,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 10, // Add some padding at the top of the list
+    paddingHorizontal: 5,
+    paddingTop: 5, // Add some padding at the top of the list
     paddingBottom: 30, // Padding at the bottom
   },
   centerContainer: { // Used for Loading and Empty states
@@ -305,14 +323,14 @@ const styles = StyleSheet.create({
   card: {
     padding: 16,
     borderRadius: 12,
-    marginBottom: 16,
-    borderWidth: 1,
+    marginBottom: 5,
+    borderWidth: 0,
     // Dynamic background, border, shadow colors
     // Shadow properties
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3, // for Android shadow
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   cardHeader: {
     marginBottom: 10,
@@ -375,12 +393,34 @@ const styles = StyleSheet.create({
   editButton: {
     marginRight: 8, // Space between buttons
     // Background color set dynamically
+    // ...Platform.select({
+    //   ios: {
+    //     shadowColor: '#000',
+    //     shadowOffset: { width: 0, height: 4 },
+    //     shadowOpacity: 0.15,
+    //     shadowRadius: 12,
+    //   },
+    //   android: {
+    //     elevation: 6,
+    //   },
+    // }),
   },
   deleteButton: {
     marginLeft: 8, // Space between buttons
-    borderWidth: 1.5, // Make border slightly thicker for outline button
+    borderWidth: 0, // Make border slightly thicker for outline button
     backgroundColor: 'transparent', // Outline button background
     // Border color set dynamically
+    // ...Platform.select({
+    //   ios: {
+    //     shadowColor: '#000',
+    //     shadowOffset: { width: 0, height: 4 },
+    //     shadowOpacity: 0.15,
+    //     shadowRadius: 12,
+    //   },
+    //   android: {
+    //     elevation: 6,
+    //   },
+    // }),
   },
   buttonText: {
       fontWeight: 'bold',

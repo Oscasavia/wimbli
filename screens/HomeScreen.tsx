@@ -31,16 +31,32 @@ import {
   arrayUnion,
   getDoc,
   Timestamp, // Import Timestamp
+  GeoPoint, // Import GeoPoint
+  orderBy,   // Import orderBy
+  startAt,   // Import startAt
+  endAt,     // Import endAt
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
 import { onAuthStateChanged } from "firebase/auth";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Feather } from "@expo/vector-icons"; // Use Feather exclusively
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as Location from 'expo-location'; // Import expo-location
+import { geohashQueryBounds, distanceBetween } from 'geofire-common'; // Import geofire functions
 // Removed LinearGradient, FontAwesome, Animated, PanResponder
+
+// --- Define distance options in miles ---
+const DISTANCE_OPTIONS = {
+  "All": { label: "All Distances", value: "All" },
+  "1mi": { label: "Within 1 mile", value: "1mi", miles: 1 },
+  "5mi": { label: "Within 5 miles", value: "5mi", miles: 5 },
+  "10mi": { label: "Within 10 miles", value: "10mi", miles: 10 },
+  "25mi": { label: "Within 25 miles", value: "25mi", miles: 25 }, // Added more options
+};
+const KM_PER_MILE = 1.60934; // Conversion factor
 
 // Updated Post type
 type Post = {
@@ -54,6 +70,8 @@ type Post = {
   createdBy: string;
   creatorUsername?: string; // Renamed for clarity, matches PostScreen
   creatorProfilePic?: string; // Renamed for clarity, matches PostScreen
+  coordinates?: GeoPoint; // Added GeoPoint coordinates
+  geohash?: string;       // Added geohash
   // Add other fields if they exist
 };
 
@@ -78,9 +96,12 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [distanceRadius, setDistanceRadius] = useState<"All" | "1km" | "5km" | "10km">("All"); // Filter state (logic not implemented)
+  const [distanceRadius, setDistanceRadius] = useState<keyof typeof DISTANCE_OPTIONS>("All"); // Filter state (logic not implemented)
   const [selectedFee, setSelectedFee] = useState<"All" | "Free" | "Paid">("All"); // Filter state
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [locationError, setLocationError] = useState<string | null>(null); // For location errors
+  const [isFetchingLocation, setIsFetchingLocation] = useState(false); // Location fetching state
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -95,176 +116,361 @@ export default function HomeScreen() {
   const shadowColor = currentTheme.shadowColor || "#000";
   const savedIconColor = currentTheme.primary || 'blue'; // Color for saved bookmark
 
+  // --- Function to get User Location ---
+  const getUserLocation = useCallback(async () => {
+    setLocationError(null);
+    setIsFetchingLocation(true);
+    console.log("Attempting to get user location...");
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        setLocationError('Permission to access location was denied. Please enable it in settings.');
+        Alert.alert('Location Permission Required', 'Please enable location services in your settings to filter by distance.');
+        setIsFetchingLocation(false);
+        setUserLocation(null); // Explicitly set to null on denial
+        setDistanceRadius("All"); // Reset filter if permission denied
+        return null;
+      }
+
+      // Set a timeout for location fetching
+      const locationPromise = Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced, // Use Balanced for faster results, High if needed
+      });
+
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('Location request timed out')), 10000) // 10-second timeout
+      );
+
+      const locationResult = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
+
+      const coords = {
+        latitude: locationResult.coords.latitude,
+        longitude: locationResult.coords.longitude,
+      };
+      console.log("User location obtained:", coords);
+      setUserLocation(coords);
+      setIsFetchingLocation(false);
+      return coords; // Return coords for immediate use
+    } catch (error: any) {
+      console.error("Error getting location:", error);
+      setLocationError(`Could not retrieve location: ${error.message}`);
+      Alert.alert("Location Error", `Could not retrieve your location: ${error.message}`);
+      setUserLocation(null); // Explicitly set to null on error
+      setIsFetchingLocation(false);
+      setDistanceRadius("All"); // Reset filter on error
+      return null;
+    }
+  }, []);
+
   // Effect to fetch user interests and posts
   useEffect(() => {
+    let isMounted = true; // Flag to prevent state updates on unmounted component
     let unsubscribeUser: (() => void) | null = null;
     let unsubscribePosts: (() => void) | null = null;
-    console.log("HomeScreen useEffect triggered."); // Log effect trigger
 
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed. User:", user ? user.uid : null);
+    console.log("HomeScreen useEffect triggered.");
 
-      // --- Cleanup listeners from previous auth state ---
-      // It's crucial to clean up listeners if the user logs out or changes
-      if (unsubscribeUser) {
-        console.log("Cleaning up previous user listener.");
-        unsubscribeUser();
-        unsubscribeUser = null;
-      }
-      if (unsubscribePosts) {
-        console.log("Cleaning up previous posts listener.");
-        unsubscribePosts();
-        unsubscribePosts = null;
-      }
+    // --- Helper Function to Process Posts (including distance filtering) ---
+  const processPosts = async (
+    docs: any[], // Firebase DocumentSnapshot[]
+    filters: any,
+    center: [number, number] | null // User's location [lat, lon] or null
+): Promise<Post[]> => {
 
-      // --- Handle User Logout: Reset state here ONLY ---
-      if (!user) {
-        console.log("User logged out. Resetting state.");
-        setPosts([]);
-        setUserInterests([]); // Reset interests state on logout
-        setSavedPosts([]);   // Reset saved posts state on logout
-        setLoading(false);   // Stop loading if no user
-        return; // Stop further setup for this auth state change
-      }
+    const postProcessingPromises = docs.map(async (docSnap) => {
+        const data = docSnap.data();
+        const postId = docSnap.id;
 
-      // --- User is Logged In ---
-      const userId = user.uid;
-      // Set loading true when we are about to set up listeners for a logged-in user
-      // Only set if not already loading maybe? Or manage carefully. Let's keep it simple for now.
-      setLoading(true);
-      console.log(`User ${userId} logged in. Setting up listeners...`);
+        // --- Apply Non-Geo Filters First ---
+        const matchInterest = filters.userInterests.length === 0 || (data.category && filters.userInterests.includes(data.category));
+        const matchCategory = filters.selectedCategory === "All" || data.category === filters.selectedCategory;
+        const searchTextLower = filters.searchText.toLowerCase();
+        const matchSearch = !filters.searchText ||
+            (data.title && data.title.toLowerCase().includes(searchTextLower)) ||
+            (data.description && data.description.toLowerCase().includes(searchTextLower));
+        let matchFee = true;
+        if (filters.selectedFee === "Free") matchFee = data.fee === 0;
+        else if (filters.selectedFee === "Paid") matchFee = data.fee > 0;
 
-      // --- Listener for User Interests (No reset here) ---
+        if (!matchInterest || !matchCategory || !matchSearch || !matchFee) {
+            return null; // Skip if basic filters don't match
+        }
+
+        // --- Apply Geo Filter (Client-Side) ---
+        let matchDistance = true; // Default to true if no distance filter applied
+        if (filters.distanceRadius !== "All" && center) {
+            if (!data.coordinates || !(data.coordinates instanceof GeoPoint)) {
+                console.warn(`Post ${postId} missing valid coordinates.`);
+                return null; // Skip posts without valid coordinates when filtering by distance
+            }
+            const postCoords: [number, number] = [data.coordinates.latitude, data.coordinates.longitude];
+            const distanceInKm = distanceBetween(postCoords, center);
+            const distanceInMiles = distanceInKm / KM_PER_MILE;
+            const radiusKey = filters.distanceRadius as keyof typeof DISTANCE_OPTIONS;
+const radiusOption = DISTANCE_OPTIONS[radiusKey];
+const radiusInMiles = 'miles' in radiusOption ? radiusOption.miles : null;
+
+            if (radiusInMiles !== null) {
+              matchDistance = distanceInMiles <= radiusInMiles;
+            }
+            // console.log(`Post ${postId}: Dist ${distanceInMiles.toFixed(2)} mi vs Radius ${radiusInMiles} mi -> Match: ${matchDistance}`);
+        } else if (filters.distanceRadius !== "All" && !center) {
+            // Should not happen if location fetching logic is correct, but handle defensively
+            return null; // Cannot determine distance match without user location
+        }
+
+        if (!matchDistance) {
+           return null; // Skip if distance filter doesn't match
+        }
+
+        // --- If all filters pass, process the post data ---
+        let creatorUsername = data.creatorUsername || "Unknown";
+        let creatorProfilePic = data.creatorProfilePic || "";
+
+        // Fetch creator details if missing (optimize this - maybe store directly on post?)
+        if ((creatorUsername === "Unknown" || !creatorProfilePic) && data.createdBy) {
+            try {
+                const userDoc = await getDoc(doc(db, "users", data.createdBy));
+                if (userDoc.exists()) {
+                    const userData = userDoc.data();
+                    creatorUsername = userData.username || "Unknown";
+                    creatorProfilePic = userData.profilePicture || "";
+                }
+            } catch (error) {
+                console.error(`Failed creator fetch for post ${postId}:`, error);
+            }
+        }
+
+        // Handle date
+        let postDate: Timestamp | string = data.date || Timestamp.now(); // Default or fallback
+         if (data.date && data.date instanceof Timestamp) {
+              postDate = data.date;
+          } else if (data.date && typeof data.date === 'string') {
+              // Attempt to parse if it's a string (though it should be Timestamp)
+              const parsed = new Date(data.date);
+              if (!isNaN(parsed.getTime())) {
+                  postDate = Timestamp.fromDate(parsed); // Convert valid string date to Timestamp
+              } else {
+                 postDate = data.date; // Keep original invalid string if parsing fails? Or use fallback?
+              }
+          } else if (data.date && typeof data.date.toDate === 'function') { // Handle cases where it might be Timestamp-like
+               postDate = data.date;
+          }
+
+
+        return {
+            id: postId,
+            title: data.title || 'No Title',
+            description: data.description || '',
+            category: data.category || 'Uncategorized',
+            location: data.location || 'No Location',
+            date: postDate,
+            fee: data.fee ?? 0,
+            createdBy: data.createdBy || '',
+            creatorUsername,
+            creatorProfilePic,
+            coordinates: data.coordinates, // Keep coordinates
+            geohash: data.geohash,       // Keep geohash
+        } as Post;
+    });
+
+    const allProcessedPosts = await Promise.all(postProcessingPromises);
+    const validPosts = allProcessedPosts.filter(p => p !== null) as Post[];
+
+    // --- Sort Final List ---
+    const sorted = [...validPosts].sort((a, b) => {
+         const timeA = a.date instanceof Timestamp ? a.date.toMillis() : (a.date ? new Date(a.date).getTime() : 0);
+         const timeB = b.date instanceof Timestamp ? b.date.toMillis() : (b.date ? new Date(b.date).getTime() : 0);
+         const validTimeA = isNaN(timeA) ? (filters.sortOrder === 'asc' ? Infinity : -Infinity) : timeA;
+         const validTimeB = isNaN(timeB) ? (filters.sortOrder === 'asc' ? Infinity : -Infinity) : timeB;
+         const diff = validTimeA - validTimeB;
+         return filters.sortOrder === "asc" ? diff : -diff;
+     });
+
+
+    console.log(`Processed ${validPosts.length} valid posts after filtering.`);
+    return sorted;
+  };
+
+    const setupListenersAndFetch = async (userId: string, currentFilters: any) => {
+      if (!isMounted) return; // Exit if component unmounted
+
+      setLoading(true); // Start loading indicator
+
+      // --- Detach previous listeners before setting up new ones ---
+      if (unsubscribeUser) unsubscribeUser();
+      if (unsubscribePosts) unsubscribePosts();
+      unsubscribeUser = null;
+      unsubscribePosts = null;
+
+      // --- Listener for User Data (Interests, Saved Posts) ---
+      // (Keep your existing user listener logic here)
       const userDocRef = doc(db, "users", userId);
       unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
+        if (!isMounted) return;
         const interestsData = userDoc.data()?.interests || [];
         const savedPostsData = userDoc.data()?.savedPosts || [];
-        // Use the robust comparison logic from previous step
-        setUserInterests((prevInterests) => {
-            // console.log('--- Comparing Interests ---'); // Keep logs if needed
-            // console.log('Previous:', JSON.stringify(prevInterests));
-            // console.log('Fetched: ', JSON.stringify(interestsData));
-            if (!interestsAreEqual(prevInterests, interestsData)) {
-                console.log("User interests ARE different, updating state.");
-                return interestsData;
-            } else {
-                // console.log("User interests are SAME, returning prev ref.");
-                return prevInterests; // Return same reference if no change
-            }
-        });
-        // Fetch persisted saved posts state here if implemented
-        // Update local state only if fetched data differs
-       setSavedPosts((prev) => savedPostsAreEqual(prev, savedPostsData) ? prev : savedPostsData);
+        setUserInterests((prev) => !interestsAreEqual(prev, interestsData) ? interestsData : prev);
+        setSavedPosts((prev) => !savedPostsAreEqual(prev, savedPostsData) ? prev : savedPostsData);
       }, (error) => {
+        if (!isMounted) return;
         console.error("Error fetching user data:", error);
-        setLoading(false); // Stop loading on user fetch error
+        // Don't necessarily stop loading here, posts might still load
       });
 
-      // --- Listener for Posts (No reset here) ---
-      const postsQuery = query(collection(db, "posts"));
-      unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
-         console.log(`Posts snapshot received. Size: ${postsSnap.size}`);
-         // ... (Keep your existing posts processing logic here: map, filter, fetch creator, sort) ...
+      // --- Fetching Posts Logic ---
+      try {
+        let finalPosts: Post[] = [];
 
-         // --- Start of example post processing logic ---
-         if (postsSnap.empty) {
-             setPosts([]);
-             setLoading(false);
-             setRefreshing(false);
-             console.log("Posts empty, loading false.");
-             return;
-         }
-         let postPromises = postsSnap.docs.map(async (docSnap) => {
-             const data = docSnap.data();
-             const postId = docSnap.id;
-             const matchInterest = userInterests.length === 0 || (data.category && userInterests.includes(data.category));
-             const matchCategory = selectedCategory === "All" || data.category === selectedCategory;
-             const searchTextLower = searchText.toLowerCase();
-             const matchSearch = !searchText ||
-                                 (data.title && data.title.toLowerCase().includes(searchTextLower)) ||
-                                 (data.description && data.description.toLowerCase().includes(searchTextLower));
-             let matchFee = true;
-             if (selectedFee === "Free") matchFee = data.fee === 0;
-             else if (selectedFee === "Paid") matchFee = data.fee > 0;
-             const matchDistance = distanceRadius === "All";
+        if (currentFilters.distanceRadius === "All") {
+          // --- Option 1: Use Realtime Listener (like before) ---
+          console.log("Fetching all posts (realtime listener setup)");
+          const postsQuery = query(collection(db, "posts")); // Add other non-geo where clauses here if possible
+          unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
+            if (!isMounted) return;
+            console.log(`Realtime posts snapshot received (All Distances). Size: ${postsSnap.size}`);
+            // Pass current filter state to processPosts
+            const processedPosts = await processPosts(
+                postsSnap.docs,
+                { ...currentFilters, userInterests }, // Include latest userInterests
+                null // No center needed
+            );
+            if (isMounted) { // Check again before setting state
+                setPosts(processedPosts);
+                setLoading(false);
+                setRefreshing(false);
+            }
+        }, (error) => {
+                if (!isMounted) return;
+                console.error("Error fetching posts (realtime):", error);
+                Alert.alert("Error", "Could not load posts.");
+                setLoading(false);
+                setRefreshing(false);
+            });
+            // Note: Initial loading(false) happens inside snapshot callback
+        } else {
+          // --- Fetching with Distance Filter (Manual Fetch) ---
+          console.log("Fetching posts with distance filter:", currentFilters.distanceRadius);
 
-             if (matchInterest && matchCategory && matchSearch && matchDistance && matchFee) {
-                 let creatorUsername = data.creatorUsername || "Unknown";
-                 let creatorProfilePic = data.creatorProfilePic || "";
-                 if ((!creatorUsername || creatorUsername === "Unknown") && data.createdBy) {
-                     try {
-                         const userDoc = await getDoc(doc(db, "users", data.createdBy));
-                         if (userDoc.exists()) {
-                             const userData = userDoc.data();
-                             creatorUsername = userData.username || "Unknown";
-                             creatorProfilePic = userData.profilePicture || "";
-                         }
-                     } catch (error) { console.error("Failed creator fetch", error); }
-                 }
-                 let postDate : Timestamp | string = data.date || Timestamp.now();
-                 if (data.date && typeof data.date.toDate === 'function') { postDate = data.date;}
-                 else if (data.date && typeof data.date === 'string') { postDate = data.date; }
+          let centerCoords = userLocation;
+          if (!centerCoords && !isFetchingLocation && !locationError) { // Avoid fetching if already trying or errored
+            centerCoords = await getUserLocation();
+          }
 
-                 return {
-                     id: postId,
-                     title: data.title || 'No Title', description: data.description || '',
-                     category: data.category || 'Uncategorized', location: data.location || 'No Location',
-                     date: postDate, fee: data.fee ?? 0, createdBy: data.createdBy || '',
-                     creatorUsername, creatorProfilePic,
-                 } as Post;
-             }
-             return null;
-         });
+          if (!centerCoords) {
+            console.warn("Cannot filter by distance: User location unavailable.");
+            if (isMounted) {
+              setPosts([]);
+              setLoading(false);
+              setRefreshing(false);
+            }
+            return;
+          }
 
-         try {
-             const allPosts = await Promise.all(postPromises);
-             const validPosts = allPosts.filter(p => p !== null) as Post[];
-             const sorted = [...validPosts].sort((a, b) => {
-                 const timeA = a.date instanceof Timestamp ? a.date.toMillis() : new Date(a.date).getTime();
-                 const timeB = b.date instanceof Timestamp ? b.date.toMillis() : new Date(b.date).getTime();
-                 const validTimeA = isNaN(timeA) ? (sortOrder === 'asc' ? Infinity : -Infinity) : timeA;
-                 const validTimeB = isNaN(timeB) ? (sortOrder === 'asc' ? Infinity : -Infinity) : timeB;
-                 const diff = validTimeA - validTimeB;
-                 return sortOrder === "asc" ? diff : -diff;
-             });
+          const radiusInMiles = DISTANCE_OPTIONS[currentFilters.distanceRadius].miles;
+          const radiusInKm = radiusInMiles * KM_PER_MILE;
+          const center: [number, number] = [centerCoords.latitude, centerCoords.longitude];
+          const bounds = geohashQueryBounds(center, radiusInKm * 1000); // meters
 
-             setPosts(sorted);
-             setLoading(false); // CRITICAL: Set loading false *after* successful processing
-             setRefreshing(false);
-             console.log("Posts processed, loading false.");
-         } catch (error) {
-             console.error("Error processing posts:", error);
-             setLoading(false); // Ensure loading is false on error
-             setRefreshing(false);
-         }
-         // --- End of example post processing logic ---
+          const promises = bounds.map((b) => {
+            const q = query(
+              collection(db, "posts"),
+              orderBy("geohash"),
+              startAt(b[0]),
+              endAt(b[1])
+            );
+            return getDocs(q);
+          });
 
-      }, (error) => {
-        console.error("Error fetching posts:", error);
-        Alert.alert("Error", "Could not load posts.");
-        setLoading(false); // Ensure loading is false on listener error
-        setRefreshing(false);
-      });
+          const snapshots = await Promise.all(promises);
+          const matchingDocs = snapshots.flatMap(snap => snap.docs);
+          console.log(`Geohash queries returned ${matchingDocs.length} potential docs.`);
 
-    }); // End of onAuthStateChanged
+          finalPosts = await processPosts(
+            matchingDocs,
+            { ...currentFilters, userInterests }, // Include latest userInterests
+            center
+          );
 
-    // Cleanup function for the useEffect hook itself
+          if (isMounted) {
+            setPosts(finalPosts);
+            setLoading(false);
+            setRefreshing(false);
+          }
+        }
+      } catch (error) {
+          if (!isMounted) return;
+          console.error("Error in post fetching logic:", error);
+          Alert.alert("Error", "An error occurred while loading events.");
+          if (isMounted) {
+            setPosts([]);
+            setLoading(false);
+            setRefreshing(false);
+          }
+        }
+    };
+  
+    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+      console.log("Auth state changed. User:", user ? user.uid : null);
+  
+      if (user) {
+        // User is signed in, setup listeners and fetch data based on current filters
+        if (isMounted) {
+            // Pass the current state of filters
+            setupListenersAndFetch(user.uid, {
+                distanceRadius,
+                selectedCategory,
+                sortOrder,
+                searchText,
+                selectedFee,
+                // userInterests will be fetched by setupListenersAndFetch itself
+            });
+        }
+      } else {
+        // User is signed out, cleanup
+        if (unsubscribeUser) unsubscribeUser();
+        if (unsubscribePosts) unsubscribePosts();
+        unsubscribeUser = null;
+        unsubscribePosts = null;
+        if (isMounted) {
+          console.log("User logged out. Resetting state.");
+          setPosts([]);
+          setUserInterests([]);
+          setSavedPosts([]);
+          setUserLocation(null);
+          setLocationError(null);
+          setLoading(false); // Set loading false as there's nothing to load
+          setRefreshing(false);
+        }
+      }
+    });
+
+    // --- Cleanup Function ---
     return () => {
+      isMounted = false; // Set flag on unmount
       console.log("HomeScreen useEffect cleanup.");
-      unsubscribeAuth(); // Unsubscribe auth listener
+      unsubscribeAuth();
       if (unsubscribeUser) {
-         console.log("Cleaning up user listener on unmount/re-run.");
-         unsubscribeUser(); // Ensure cleanup on unmount/re-run
+        console.log("Cleaning up user listener.");
+        unsubscribeUser();
       }
       if (unsubscribePosts) {
-         console.log("Cleaning up posts listener on unmount/re-run.");
-         unsubscribePosts(); // Ensure cleanup on unmount/re-run
+        console.log("Cleaning up posts listener.");
+        unsubscribePosts();
       }
     };
-  // Use the original dependencies array
-  }, [selectedCategory, sortOrder, searchText, userInterests, distanceRadius, selectedFee]);
+  
+  }, [selectedCategory, sortOrder, searchText, userInterests, distanceRadius, selectedFee, getUserLocation]);
 
-
+  useFocusEffect(
+    useCallback(() => {
+      StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
+      if (Platform.OS === "android") {
+        StatusBar.setBackgroundColor(cardBackgroundColor, true);
+      }
+    }, [isDark, cardBackgroundColor])
+  );
+  
   // --- Actions ---
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -418,7 +624,13 @@ export default function HomeScreen() {
     const isSaved = savedPosts.includes(item.id);
 
     return (
+      // <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
       <TouchableOpacity activeOpacity={0.8} onPress={() => openDetailsModal(item)}>
+        <StatusBar
+          translucent={false}
+          backgroundColor={cardBackgroundColor}
+          barStyle={isDark ? "light-content" : "dark-content"}
+        />
         <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
           {/* Top Row: Creator Info + Bookmark */}
           <View style={styles.cardTopRow}>
@@ -518,12 +730,15 @@ export default function HomeScreen() {
       </View>
 
       {/* Main Content: List or Loading/Empty State */}
-      {loading ? (
+      {loading || isFetchingLocation ? (
         <View style={styles.centerStatusContainer}>
           <ActivityIndicator size="large" color={currentTheme.primary} />
           <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
-            Loading events...
+            {isFetchingLocation ? 'Getting your location...' : 'Loading events...'}
           </Text>
+          {locationError && ( // Show location error if any
+              <Text style={[styles.statusText, { color: 'red', marginTop: 10 }]}>{locationError}</Text>
+           )}
         </View>
       ) : posts.length === 0 ? (
         <ScrollView
@@ -531,9 +746,14 @@ export default function HomeScreen() {
             refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentTheme.primary]} tintColor={currentTheme.primary}/>}
         >
           <Feather name="calendar" size={50} color={currentTheme.textSecondary} />
-          <Text style={[styles.statusTitle, { color: currentTheme.textPrimary }]}>No Events Found</Text>
+          <Text style={[styles.statusTitle, { color: currentTheme.textPrimary }]}>
+            {locationError ? "Location Error" : "No Events Found"}
+          </Text>
           <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
-            No events match your current filters or interests. Try adjusting the filters!
+            {locationError
+                    ? locationError // Display the specific error
+                    : "No events match your current filters. Try adjusting them or granting location permission!"
+                }
           </Text>
         </ScrollView>
       ) : (
@@ -713,7 +933,7 @@ export default function HomeScreen() {
                      selectedValue={sortOrder}
                      onValueChange={(itemValue) => setSortOrder(itemValue as "desc" | "asc")}
                      style={[styles.picker, { color: currentTheme.textPrimary }]}
-                     itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
+                    //  itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
                      dropdownIconColor={currentTheme.textPrimary}
                      prompt="Sort Order"
                    >
@@ -729,20 +949,27 @@ export default function HomeScreen() {
                   <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
                     <Picker
                       selectedValue={distanceRadius}
-                      onValueChange={(itemValue) => setDistanceRadius(itemValue as "All" | "1km" | "5km" | "10km")}
+                      onValueChange={(itemValue) => {
+                        const newRadius = itemValue as keyof typeof DISTANCE_OPTIONS;
+                              // If user selects a distance, ensure we have location or try to get it
+                              if (newRadius !== "All" && !userLocation) {
+                                  getUserLocation(); // Attempt to get location when filter is selected
+                              }
+                              setDistanceRadius(newRadius);
+                      }}
                       style={[styles.picker, { color: currentTheme.textPrimary }]}
                       itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
                       dropdownIconColor={currentTheme.textPrimary}
                       prompt="Select Distance"
                       // enabled={false} // Disable until implemented
                     >
-                      {/* <Picker.Item label="All Distances" value="All" />
-                      <Picker.Item label="Within 1 km (soon)" value="1km" disabled={true}/>
-                      <Picker.Item label="Within 5 km (soon)" value="5km" disabled={true}/>
-                      <Picker.Item label="Within 10 km (soon)" value="10km" disabled={true}/> */}
+                      {Object.entries(DISTANCE_OPTIONS).map(([key, option]) => (
+                             <Picker.Item key={key} label={option.label} value={option.value} />
+                          ))}
                     </Picker>
                   </View>
-                  <Text style={styles.comingSoonText}>(Distance filter coming soon!)</Text>
+                    {isFetchingLocation && distanceRadius !== "All" && <Text style={[styles.statusText, {fontSize: 12, marginTop: 5}]}>Fetching location...</Text>}
+                    {locationError && distanceRadius !== "All" && <Text style={[styles.statusText, {fontSize: 12, marginTop: 5, color: 'red'}]}>{locationError}</Text>}
                 </View>
 
                {/* Fee Filter */}
@@ -802,18 +1029,26 @@ const styles = StyleSheet.create({
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
     borderBottomColor: 'transparent', // Use theme border
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   searchContainer: {
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    borderRadius: 10,
+    borderRadius: 25,
     paddingHorizontal: 12,
-    borderWidth: 1,
+    borderWidth: 0,
     height: 44, // Consistent height
     // Dynamic background and border color
   },
@@ -853,20 +1088,20 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   listContainer: { // For FlatList
-    paddingHorizontal: 15,
-    paddingTop: 10,
+    paddingHorizontal: 5,
+    paddingTop: 5,
     paddingBottom: 30,
   },
   // --- Card Styles (renderPostCard) ---
   card: {
     padding: 15,
     borderRadius: 12,
-    marginBottom: 10,
-    borderWidth: 1,
+    marginBottom: 5,
+    borderWidth: 0,
     // Dynamic background, border, shadow colors
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     elevation: 3,
   },
   cardTopRow: {
@@ -975,7 +1210,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   drawerSection: {
-    marginBottom: 22,
+    marginBottom: 12,
   },
   drawerLabel: {
     fontSize: 15,
@@ -983,36 +1218,48 @@ const styles = StyleSheet.create({
     marginBottom: 10,
   },
   pickerWrapper: {
-    borderRadius: 10,
-    borderWidth: 1,
+    borderRadius: 25,
+    borderWidth: 0,
     overflow: "hidden", // Clip picker on Android
     justifyContent: 'center', // Align picker text vertically
     height: 55, // Consistent height
     // Dynamic background and border color
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
   },
   picker: {
     width: "100%",
     height: '100%',
     // Dynamic color
+    backgroundColor: 'transparent',
   },
   drawerCloseButton: {
-    paddingVertical: 14,
-    borderRadius: 25, // Rounded button
+    flexDirection: "row",
     alignItems: "center",
-    marginTop: 25, // Space above button
+    justifyContent: "center",
+    marginTop: 25,
+    paddingVertical: 12,
+    borderRadius: 25, // Fully rounded buttons
+    flex: 1, // Equal width
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   drawerCloseButtonText: {
     fontWeight: "bold",
     fontSize: 16,
   },
-  comingSoonText: {
-     fontSize: 12,
-     fontStyle: 'italic',
-     textAlign: 'center',
-     marginTop: 5,
-     opacity: 0.7,
-     color: '#757575', // Use theme color
-  },
+  // comingSoonText: {
+  //    fontSize: 12,
+  //    fontStyle: 'italic',
+  //    textAlign: 'center',
+  //    marginTop: 5,
+  //    opacity: 0.7,
+  //    color: '#757575', // Use theme color
+  // },
 
   // --- Post Details Modal Styles ---
   detailsModalOverlay: {
@@ -1121,6 +1368,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 25, // Fully rounded buttons
     flex: 1, // Equal width
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.15,
+        shadowRadius: 12,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
   },
   actionButtonText: {
     fontWeight: "bold",
@@ -1139,7 +1397,7 @@ const styles = StyleSheet.create({
   closeButtonAlt: {
     // Secondary button style
     marginLeft: 10,
-    borderWidth: 1.5,
+    borderWidth: 0,
     // Dynamic background and border color
   },
 });

@@ -54,6 +54,7 @@ export default function SavedEventsScreen() {
 
     // --- Theme variable fallbacks ---
     const cardBackgroundColor = currentTheme.cardBackground || (isDark ? '#1c1c1e' : '#ffffff');
+    const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
     const cardBorderColor = currentTheme.cardBorder || (isDark ? '#3a3a3c' : '#e0e0e0');
     const shadowColor = currentTheme.shadowColor || '#000';
     const separatorColor = currentTheme.separator || (isDark ? '#3a3a3c' : '#e0e0e0');
@@ -214,7 +215,7 @@ export default function SavedEventsScreen() {
 
         return (
             <TouchableOpacity activeOpacity={0.8} onPress={() => navigateToDetails(item)}>
-                <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
+                <View style={[styles.card, { backgroundColor: cardBackgroundColor }]}>
                     {/* Top Row: Title + Unsave Button */}
                     <View style={styles.cardHeader}>
                         <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]} numberOfLines={2}>
@@ -281,10 +282,11 @@ export default function SavedEventsScreen() {
 
     // Main List View
     return (
-        <SafeAreaView style={{ flex: 1 }}>
+        <SafeAreaView style={[styles.screen, { backgroundColor: inputBackgroundColor }]}>
             <StatusBar
-              backgroundColor={cardBackgroundColor}
-              // barStyle={isDark ? "light-content" : "dark-content"}
+            translucent={false}
+            backgroundColor={cardBackgroundColor}
+            barStyle={isDark ? "light-content" : "dark-content"}
             />
             <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
                {/* Screen Title */}
@@ -321,10 +323,18 @@ const styles = StyleSheet.create({
         // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
         borderBottomWidth: 1,
         borderBottomColor: 'transparent', // Use theme border
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.08,
-        shadowRadius: 5,
-        elevation: 3,
+        ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.12,
+              shadowRadius: 6,
+            },
+            android: {
+              elevation: 6,
+            },
+          }),
+          zIndex: 10, // Ensures it stays above the list in case of overlap
     },
     screenTitle: {
         fontSize: 24,
@@ -336,8 +346,8 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
     },
   listContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 20, // Space below header (now native)
+    paddingHorizontal: 5,
+    paddingTop: 5, // Space below header (now native)
     paddingBottom: 30,
   },
   centerContainer: { // For Loading and Empty states
@@ -365,14 +375,14 @@ const styles = StyleSheet.create({
   },
   // Card Styles (Similar to HomeScreen/ManagePostsScreen)
   card: {
-    padding: 16,
+    padding: 15,
     borderRadius: 12,
-    // marginBottom: 16, // Remove if using ItemSeparatorComponent height
-    borderWidth: 1,
+    // marginBottom: 0,
+    borderWidth: 0,
     // Dynamic background, border, shadow colors
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
     elevation: 3,
   },
   cardHeader: {

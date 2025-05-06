@@ -8,6 +8,7 @@ import {
   Alert,
   ScrollView,
   Platform,
+  StatusBar,
   KeyboardAvoidingView,
   ActivityIndicator, // Added for loading state on button
 } from "react-native";
@@ -16,6 +17,8 @@ import {
   addDoc,
   serverTimestamp,
   setDoc,
+  getDoc,
+  GeoPoint,
   doc,
   Timestamp, // Import Timestamp for type checking if needed
 } from "firebase/firestore";
@@ -32,6 +35,8 @@ import { lightTheme, darkTheme } from "../themeColors";
 import { Picker } from "@react-native-picker/picker";
 // Removed LinearGradient import
 import { Feather } from "@expo/vector-icons"; // Use Feather for icons
+import * as Location from 'expo-location'; // Import for location services
+import { geohashForLocation } from "geofire-common"; // Import the geohash function
 
 // Assuming INTEREST_OPTIONS remains the same
 const INTEREST_OPTIONS = [
@@ -53,6 +58,7 @@ export default function PostScreen() {
   const [date, setDate] = useState(new Date());
   const [fee, setFee] = useState(""); // Keep as string for input, parse on save
   const [isLoading, setIsLoading] = useState(false); // Saving state
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -61,6 +67,7 @@ export default function PostScreen() {
   // --- Theme variable fallbacks ---
   const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
   const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const cardBorderColor = currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
   const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
   const shadowColor = currentTheme.shadowColor || "#000";
@@ -72,6 +79,7 @@ export default function PostScreen() {
       setDescription(editPost.description || "");
       setCategory(editPost.category || "");
       setLocation(editPost.location || "");
+      // setDate(editPost.date instanceof Timestamp ? editPost.date.toDate() : new Date(editPost.date) || new Date());
       setFee(editPost.fee?.toString() || ""); // Ensure fee is string for input
       // Handle date conversion safely (Firestore timestamp or ISO string)
       try {
@@ -113,6 +121,41 @@ export default function PostScreen() {
     }, [editPost]) // Dependency ensures this logic reruns if editPost status changes
   );
 
+  useFocusEffect(
+      useCallback(() => {
+        StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
+        if (Platform.OS === "android") {
+          StatusBar.setBackgroundColor(cardBackgroundColor, true);
+        }
+      }, [isDark, cardBackgroundColor])
+    );
+
+  // Get user's location on component mount
+  useEffect(() => {
+    const getLocation = async () => {
+        try {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+                Alert.alert('Location Permission Required', 'Please enable location services to use this feature.');
+                return;
+            }
+
+            const locationData = await Location.getCurrentPositionAsync({
+                accuracy: Location.Accuracy.High,
+            });
+            setUserLocation({
+                latitude: locationData.coords.latitude,
+                longitude: locationData.coords.longitude,
+            });
+        } catch (error) {
+            console.error("Error getting location:", error);
+            Alert.alert("Location Error", "Could not retrieve your location.");
+        }
+    };
+
+    getLocation();
+  }, []);
+
   const resetFormFields = () => {
     setTitle("");
     setDescription("");
@@ -128,40 +171,62 @@ export default function PostScreen() {
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     const trimmedLocation = location.trim();
-
+  
     if (!trimmedTitle || !trimmedDescription || !category || !trimmedLocation || !date) {
       Alert.alert("Missing Information", "Please fill out title, description, category, location, and date.");
       return;
     }
-
+  
     const currentUser = auth.currentUser;
     if (!currentUser) {
-        Alert.alert("Error", "You must be logged in to post.");
-        return;
+      Alert.alert("Error", "You must be logged in to post.");
+      return;
     }
-
+  
     setIsLoading(true);
+
+    // Ensure userLocation is available before proceeding
+   if (!userLocation) {
+    Alert.alert("Location Missing", "Could not retrieve location. Cannot save post with geospatial data.");
+    setIsLoading(false); // Stop loading
+    return; // Prevent saving without location
+  }
+
     try {
+      // Fetch the user's profile picture URL
+      const userDoc = await getDoc(doc(db, "users", currentUser.uid));
+      const creatorProfilePic = userDoc.data()?.profilePicture || currentUser.photoURL || null;
+
+      // --- Create GeoPoint and Geohash ---
+     const coords = { latitude: userLocation.latitude, longitude: userLocation.longitude };
+     const hash = geohashForLocation([coords.latitude, coords.longitude]);
+     const point = new GeoPoint(coords.latitude, coords.longitude);
+     // --- ---
+  
       const postData = {
         title: trimmedTitle,
         description: trimmedDescription,
         category: category,
         location: trimmedLocation,
-        date: Timestamp.fromDate(date), // Store as Firestore Timestamp
-        fee: parseFloat(fee) || 0, // Default to 0 if fee is empty or invalid
+        date: Timestamp.fromDate(date),
+        fee: parseFloat(fee) || 0,
         createdBy: currentUser.uid,
         creatorUsername: currentUser.displayName || "Unknown User", // Add username for display
-        // Optional: add creator profile picture URL
-        // creatorProfilePic: currentUser.photoURL || null,
+        creatorProfilePic: creatorProfilePic, // Include profile picture URL
+        // --- Store GeoPoint and Geohash ---
+       coordinates: point,   // Store location as GeoPoint
+       geohash: hash,        // Store the calculated geohash
+        // latitude: userLocation?.latitude || null,  // Store latitude
+        // longitude: userLocation?.longitude || null, // Store longitude
       };
-
+  
       if (editPost && editPost.id) {
         // Update existing post
         const postRef = doc(db, "posts", editPost.id);
         await setDoc(postRef, {
-            ...postData,
-            updatedAt: serverTimestamp(), // Add updated timestamp
-        }, { merge: true }); // Use merge: true to only update provided fields + updatedAt
+          ...postData,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
         Alert.alert("Success", "Your post has been updated.");
       } else {
         // Create new post
@@ -171,9 +236,9 @@ export default function PostScreen() {
         });
         Alert.alert("Success", "Your post has been created.");
       }
-
-      navigation.goBack(); // Go back after successful post/update
-
+  
+      navigation.goBack();
+  
     } catch (error: any) {
       console.error("Error saving post:", error);
       Alert.alert("Error", `Failed to save post: ${error.message}`);
@@ -231,11 +296,11 @@ export default function PostScreen() {
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoidingContainer}
-        behavior={Platform.OS === "ios" ? "padding" : undefined} // Use "height" if padding doesn't work well
-        keyboardVerticalOffset={Platform.OS === "ios" ? 64 : 0} // Adjust offset as needed
-      >
+      <StatusBar
+        translucent={false}
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
         <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
          {/* Screen Title */}
          <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
@@ -248,8 +313,12 @@ export default function PostScreen() {
            keyboardShouldPersistTaps="handled"
            showsVerticalScrollIndicator={false}
         >
+          <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
            {/* Title Input */}
+
+           
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Event Title</Text>
+           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
            <TextInput
              placeholder="Enter the title of your event"
              value={title}
@@ -258,9 +327,11 @@ export default function PostScreen() {
              placeholderTextColor={placeholderTextColor}
              maxLength={100}
            />
+           </View>
 
            {/* Description Input */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Description</Text>
+           <View style={[styles.textAreaContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
            <TextInput
              placeholder="Describe your event"
              value={description}
@@ -270,9 +341,11 @@ export default function PostScreen() {
              placeholderTextColor={placeholderTextColor}
              maxLength={500}
            />
+           </View>
 
            {/* Location Input */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Location</Text>
+           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
            <TextInput
              placeholder="e.g., Millennium Park, Online"
              value={location}
@@ -281,6 +354,7 @@ export default function PostScreen() {
              placeholderTextColor={placeholderTextColor}
              maxLength={150}
            />
+           </View>
 
            {/* Category Picker */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Category</Text>
@@ -302,6 +376,7 @@ export default function PostScreen() {
 
            {/* Fee Input */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Fee ($)</Text>
+           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
            <TextInput
              placeholder="e.g., 10.50 (or leave blank for free)"
              value={fee}
@@ -310,9 +385,11 @@ export default function PostScreen() {
              style={[styles.input, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
              placeholderTextColor={placeholderTextColor}
            />
+           </View>
 
            {/* Date & Time Picker Trigger */}
            <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Date & Time</Text>
+           <View style={[styles.dateTriggerContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
            <TouchableOpacity
               onPress={() => showDateTimePicker('date')} // Start with date picker
               style={[styles.input, styles.dateTrigger, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
@@ -322,6 +399,7 @@ export default function PostScreen() {
              </Text>
              <Feather name="calendar" size={20} color={currentTheme.textSecondary} />
            </TouchableOpacity>
+           </View>
 
            {/* Submit Button */}
            <TouchableOpacity
@@ -344,9 +422,8 @@ export default function PostScreen() {
 
            {/* Spacer at bottom */}
            <View style={{ height: 50 }} />
-
+          </View>
         </ScrollView>
-      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
@@ -375,14 +452,22 @@ const styles = StyleSheet.create({
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
     borderBottomColor: 'transparent', // Use theme border
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 5,
-    elevation: 3,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   scrollContainer: {
-    paddingHorizontal: 20,
-    paddingTop: 10, // Reduced top padding as title is outside scroll
+    paddingHorizontal: 5,
+    paddingTop: 5, // Reduced top padding as title is outside scroll
     paddingBottom: 30,
   },
   screenTitle: {
@@ -394,32 +479,77 @@ const styles = StyleSheet.create({
     marginTop: '1.9%',
     marginBottom: 4,
   },
+  card: {
+    padding: 15,
+    borderRadius: 12,
+    marginBottom: 5,
+    borderWidth: 0,
+    // Dynamic background, border, shadow colors
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+  },
   label: {
     fontSize: 16,
     fontWeight: "600",
     marginBottom: 8,
     marginTop: 15, // Space above labels
   },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0,
+    borderRadius: 25, // Consistent radius
+    paddingHorizontal: 12,
+    marginBottom: 5, // More space between inputs
+    height: 50, // Consistent height
+    // backgroundColor, borderColor set dynamically
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
+  },
+  textAreaContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0,
+    borderRadius: 25, // Consistent radius
+    paddingHorizontal: 12,
+    marginBottom: 5, // More space between inputs
+    height: 100, // Consistent height
+    // backgroundColor, borderColor set dynamically
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   input: {
-    borderWidth: 1,
+    flex: 1,
+    borderWidth: 0,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    borderRadius: 10,
+    // borderRadius: 10,
+    borderRadius: 25,
     fontSize: 16,
     marginBottom: 5, // Reduced bottom margin, handled by label's marginTop
     // Dynamic styles applied via helper function
   },
   textArea: {
-    height: 100, // Slightly shorter default height
+    height: 90, // Slightly shorter default height
     textAlignVertical: 'top',
   },
   pickerContainer: {
-    borderWidth: 1,
-    borderRadius: 10,
+    borderWidth: 0,
+    borderRadius: 25,
     marginBottom: 5,
     overflow: 'hidden', // Ensure border radius clips the picker background on Android
     justifyContent: 'center', // Center picker vertically for better alignment
     height: 55, // Set fixed height consistent with inputs
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
   },
   picker: {
     width: "100%",
@@ -427,11 +557,28 @@ const styles = StyleSheet.create({
     // Minimal styling here, container handles appearance
      backgroundColor: 'transparent', // Make picker background transparent
   },
+  dateTriggerContainer: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0,
+    borderRadius: 25, // Consistent radius
+    paddingHorizontal: 12,
+    marginBottom: 10, // More space between inputs
+    height: 55, // Consistent height
+    // backgroundColor, borderColor set dynamically
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 1,
+  },
   dateTrigger: {
+    // flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    height: 55, // Match input height
+    // height: 55, // Match input height
+    // textAlignVertical: 'top',
   },
   dateTriggerText: {
     fontSize: 16,
