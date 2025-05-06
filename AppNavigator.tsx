@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   StyleSheet,
   Platform,
+  Pressable,
   Text, // Added for potential custom labels
 } from "react-native";
 import { useTheme } from "./ThemeContext"; // Adjust path if needed
 import { lightTheme, darkTheme } from "./themeColors"; // Adjust path if needed
+import * as NavigationBar from 'expo-navigation-bar';
+import { useEffect } from 'react';
 
 // Import Screen Components
 import HomeScreen from "./screens/HomeScreen";
@@ -36,13 +39,21 @@ export default function AppNavigator() { // Or AppTabs
   const createButtonIconColor = currentTheme.buttonText || '#ffffff';
   const shadowColor = currentTheme.shadowColor || '#000';
 
+  useEffect(() => {
+    if (Platform.OS === 'android') {
+      NavigationBar.setBackgroundColorAsync(barBackgroundColor);
+      NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark'); // Adjust button icons for visibility
+    }
+  }, [barBackgroundColor, isDark]);
+
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
+        animationEnabled: false,
         headerShown: false, // Keep headers managed by individual screens or stack navigators
         tabBarShowLabel: true, // **Enable labels**
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 60 : 55, // Adjust height (consider labels)
+          height: Platform.OS === 'ios' ? 65 : 60, // Adjust height (consider labels)
           backgroundColor: barBackgroundColor,
           borderTopColor: "transparent",
           // Shadow (adjust as needed)
@@ -57,6 +68,7 @@ export default function AppNavigator() { // Or AppTabs
               elevation: 10, // Stronger elevation for Android
             },
           }),
+          // zIndex: 10,
         },
         tabBarActiveTintColor: activeColor,
         tabBarInactiveTintColor: inactiveColor,
@@ -96,6 +108,31 @@ export default function AppNavigator() { // Or AppTabs
           // Return Feather icon for standard tabs
           return <Feather name={iconName} size={iconSize} color={color} />;
         },
+        // ...(Platform.OS === 'android' ? { pressColor: 'transparent' } : {}), // Disables Android ripple effect
+        // pressOpacity: 1, // Disables opacity change on press for iOS or older Android
+        tabBarButton: (props) => {
+          // props contains: accessibilityState, children (Icon & Label), onPress, onLongPress, style, etc.
+
+          // This custom tabBarButton will apply to Home, Posts, Messages, Profile, etc.
+          // The "Create" screen defines its own tabBarButton in its 'options', which will override this.
+
+          return (
+            <Pressable
+              {...props} // This passes down crucial props like onPress, style, accessibilityState
+              android_ripple={{ color: 'transparent' }} // Disable ripple effect on Android
+              // For iOS: Pressable by default dims its children (icon, label) on press.
+              // Setting opacity to 1 here attempts to keep the Pressable container itself fully opaque.
+              // However, this might not prevent the children-dimming behavior.
+              // If child dimming on iOS persists, it's a stubborn default of Pressable.
+              style={({ pressed }) => [
+                props.style, // Apply default styling from the navigator for layout
+                Platform.OS === 'ios' && pressed ? { opacity: 1 } : {},
+              ]}
+            >
+              {props.children}
+            </Pressable>
+          );
+        },
       })}
     >
       {/* Define Tab Screens */}
@@ -108,15 +145,15 @@ export default function AppNavigator() { // Or AppTabs
         component={PostScreen}
         options={{
           tabBarLabel: () => null, // Hide label for the central button
-          tabBarButton: (props) => (
+          tabBarButton: (buttonProps) => (
             <TouchableOpacity
               style={[
                   styles.createButtonWrapper,
                   // Add shadow using theme color if needed
                   // styles.createButtonShadow, { shadowColor }
               ]}
-              onPress={props.onPress} // Use onPress from props
-              activeOpacity={0.8}
+              onPress={buttonProps.onPress} // Use onPress from props
+              activeOpacity={1}
             >
                <View style={[styles.createButton, { backgroundColor: createButtonBg }]}>
                   <Feather name="plus" size={28} color={createButtonIconColor} />
@@ -155,7 +192,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
-    elevation: 8,
+    elevation: 5,
     // Optional: Add a border matching the bar background for a cutout effect
     // borderWidth: 3,
     // borderColor: barBackgroundColor, // Use the theme color

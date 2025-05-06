@@ -163,304 +163,186 @@ export default function HomeScreen() {
   }, []);
 
   // Effect to fetch user interests and posts
-  useEffect(() => {
-    let isMounted = true; // Flag to prevent state updates on unmounted component
-    let unsubscribeUser: (() => void) | null = null;
-    let unsubscribePosts: (() => void) | null = null;
-
-    console.log("HomeScreen useEffect triggered.");
-
-    // --- Helper Function to Process Posts (including distance filtering) ---
-  const processPosts = async (
-    docs: any[], // Firebase DocumentSnapshot[]
-    filters: any,
-    center: [number, number] | null // User's location [lat, lon] or null
-): Promise<Post[]> => {
-
-    const postProcessingPromises = docs.map(async (docSnap) => {
-        const data = docSnap.data();
-        const postId = docSnap.id;
-
-        // --- Apply Non-Geo Filters First ---
-        const matchInterest = filters.userInterests.length === 0 || (data.category && filters.userInterests.includes(data.category));
-        const matchCategory = filters.selectedCategory === "All" || data.category === filters.selectedCategory;
-        const searchTextLower = filters.searchText.toLowerCase();
-        const matchSearch = !filters.searchText ||
-            (data.title && data.title.toLowerCase().includes(searchTextLower)) ||
-            (data.description && data.description.toLowerCase().includes(searchTextLower));
-        let matchFee = true;
-        if (filters.selectedFee === "Free") matchFee = data.fee === 0;
-        else if (filters.selectedFee === "Paid") matchFee = data.fee > 0;
-
-        if (!matchInterest || !matchCategory || !matchSearch || !matchFee) {
-            return null; // Skip if basic filters don't match
-        }
-
-        // --- Apply Geo Filter (Client-Side) ---
-        let matchDistance = true; // Default to true if no distance filter applied
-        if (filters.distanceRadius !== "All" && center) {
-            if (!data.coordinates || !(data.coordinates instanceof GeoPoint)) {
-                console.warn(`Post ${postId} missing valid coordinates.`);
-                return null; // Skip posts without valid coordinates when filtering by distance
-            }
-            const postCoords: [number, number] = [data.coordinates.latitude, data.coordinates.longitude];
-            const distanceInKm = distanceBetween(postCoords, center);
-            const distanceInMiles = distanceInKm / KM_PER_MILE;
-            const radiusKey = filters.distanceRadius as keyof typeof DISTANCE_OPTIONS;
-const radiusOption = DISTANCE_OPTIONS[radiusKey];
-const radiusInMiles = 'miles' in radiusOption ? radiusOption.miles : null;
-
-            if (radiusInMiles !== null) {
-              matchDistance = distanceInMiles <= radiusInMiles;
-            }
-            // console.log(`Post ${postId}: Dist ${distanceInMiles.toFixed(2)} mi vs Radius ${radiusInMiles} mi -> Match: ${matchDistance}`);
-        } else if (filters.distanceRadius !== "All" && !center) {
-            // Should not happen if location fetching logic is correct, but handle defensively
-            return null; // Cannot determine distance match without user location
-        }
-
-        if (!matchDistance) {
-           return null; // Skip if distance filter doesn't match
-        }
-
-        // --- If all filters pass, process the post data ---
-        let creatorUsername = data.creatorUsername || "Unknown";
-        let creatorProfilePic = data.creatorProfilePic || "";
-
-        // Fetch creator details if missing (optimize this - maybe store directly on post?)
-        if ((creatorUsername === "Unknown" || !creatorProfilePic) && data.createdBy) {
-            try {
-                const userDoc = await getDoc(doc(db, "users", data.createdBy));
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    creatorUsername = userData.username || "Unknown";
-                    creatorProfilePic = userData.profilePicture || "";
-                }
-            } catch (error) {
-                console.error(`Failed creator fetch for post ${postId}:`, error);
-            }
-        }
-
-        // Handle date
-        let postDate: Timestamp | string = data.date || Timestamp.now(); // Default or fallback
-         if (data.date && data.date instanceof Timestamp) {
-              postDate = data.date;
-          } else if (data.date && typeof data.date === 'string') {
-              // Attempt to parse if it's a string (though it should be Timestamp)
-              const parsed = new Date(data.date);
-              if (!isNaN(parsed.getTime())) {
-                  postDate = Timestamp.fromDate(parsed); // Convert valid string date to Timestamp
-              } else {
-                 postDate = data.date; // Keep original invalid string if parsing fails? Or use fallback?
+  useFocusEffect(
+    useCallback(() => {
+      let isMounted = true;
+      let unsubscribeUser: (() => void) | null = null;
+      let unsubscribePosts: (() => void) | null = null;
+  
+      const currentFilters = {
+        distanceRadius,
+        selectedCategory,
+        sortOrder,
+        searchText,
+        selectedFee,
+      };
+  
+      const setupListenersAndFetch = async (userId: string) => {
+        setLoading(true);
+  
+        if (unsubscribeUser) unsubscribeUser();
+        if (unsubscribePosts) unsubscribePosts();
+        unsubscribeUser = null;
+        unsubscribePosts = null;
+  
+        const userDocRef = doc(db, "users", userId);
+        unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
+          const interestsData = userDoc.data()?.interests || [];
+          const savedPostsData = userDoc.data()?.savedPosts || [];
+          setUserInterests((prev) => !interestsAreEqual(prev, interestsData) ? interestsData : prev);
+          setSavedPosts((prev) => !savedPostsAreEqual(prev, savedPostsData) ? savedPostsData : prev);
+        });
+  
+        try {
+          let finalPosts: Post[] = [];
+  
+          if (currentFilters.distanceRadius === "All") {
+            const postsQuery = query(collection(db, "posts"));
+            unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
+              if (!isMounted) return;
+              const processed = await processPosts(postsSnap.docs, { ...currentFilters, userInterests }, null);
+              if (isMounted) {
+                setPosts(processed);
+                setLoading(false);
+                setRefreshing(false);
               }
-          } else if (data.date && typeof data.date.toDate === 'function') { // Handle cases where it might be Timestamp-like
-               postDate = data.date;
-          }
-
-
-        return {
-            id: postId,
-            title: data.title || 'No Title',
-            description: data.description || '',
-            category: data.category || 'Uncategorized',
-            location: data.location || 'No Location',
-            date: postDate,
-            fee: data.fee ?? 0,
-            createdBy: data.createdBy || '',
-            creatorUsername,
-            creatorProfilePic,
-            coordinates: data.coordinates, // Keep coordinates
-            geohash: data.geohash,       // Keep geohash
-        } as Post;
-    });
-
-    const allProcessedPosts = await Promise.all(postProcessingPromises);
-    const validPosts = allProcessedPosts.filter(p => p !== null) as Post[];
-
-    // --- Sort Final List ---
-    const sorted = [...validPosts].sort((a, b) => {
-         const timeA = a.date instanceof Timestamp ? a.date.toMillis() : (a.date ? new Date(a.date).getTime() : 0);
-         const timeB = b.date instanceof Timestamp ? b.date.toMillis() : (b.date ? new Date(b.date).getTime() : 0);
-         const validTimeA = isNaN(timeA) ? (filters.sortOrder === 'asc' ? Infinity : -Infinity) : timeA;
-         const validTimeB = isNaN(timeB) ? (filters.sortOrder === 'asc' ? Infinity : -Infinity) : timeB;
-         const diff = validTimeA - validTimeB;
-         return filters.sortOrder === "asc" ? diff : -diff;
-     });
-
-
-    console.log(`Processed ${validPosts.length} valid posts after filtering.`);
-    return sorted;
-  };
-
-    const setupListenersAndFetch = async (userId: string, currentFilters: any) => {
-      if (!isMounted) return; // Exit if component unmounted
-
-      setLoading(true); // Start loading indicator
-
-      // --- Detach previous listeners before setting up new ones ---
-      if (unsubscribeUser) unsubscribeUser();
-      if (unsubscribePosts) unsubscribePosts();
-      unsubscribeUser = null;
-      unsubscribePosts = null;
-
-      // --- Listener for User Data (Interests, Saved Posts) ---
-      // (Keep your existing user listener logic here)
-      const userDocRef = doc(db, "users", userId);
-      unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
-        if (!isMounted) return;
-        const interestsData = userDoc.data()?.interests || [];
-        const savedPostsData = userDoc.data()?.savedPosts || [];
-        setUserInterests((prev) => !interestsAreEqual(prev, interestsData) ? interestsData : prev);
-        setSavedPosts((prev) => !savedPostsAreEqual(prev, savedPostsData) ? prev : savedPostsData);
-      }, (error) => {
-        if (!isMounted) return;
-        console.error("Error fetching user data:", error);
-        // Don't necessarily stop loading here, posts might still load
-      });
-
-      // --- Fetching Posts Logic ---
-      try {
-        let finalPosts: Post[] = [];
-
-        if (currentFilters.distanceRadius === "All") {
-          // --- Option 1: Use Realtime Listener (like before) ---
-          console.log("Fetching all posts (realtime listener setup)");
-          const postsQuery = query(collection(db, "posts")); // Add other non-geo where clauses here if possible
-          unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
-            if (!isMounted) return;
-            console.log(`Realtime posts snapshot received (All Distances). Size: ${postsSnap.size}`);
-            // Pass current filter state to processPosts
-            const processedPosts = await processPosts(
-                postsSnap.docs,
-                { ...currentFilters, userInterests }, // Include latest userInterests
-                null // No center needed
-            );
-            if (isMounted) { // Check again before setting state
-                setPosts(processedPosts);
-                setLoading(false);
-                setRefreshing(false);
-            }
-        }, (error) => {
-                if (!isMounted) return;
-                console.error("Error fetching posts (realtime):", error);
-                Alert.alert("Error", "Could not load posts.");
-                setLoading(false);
-                setRefreshing(false);
             });
-            // Note: Initial loading(false) happens inside snapshot callback
-        } else {
-          // --- Fetching with Distance Filter (Manual Fetch) ---
-          console.log("Fetching posts with distance filter:", currentFilters.distanceRadius);
-
-          let centerCoords = userLocation;
-          if (!centerCoords && !isFetchingLocation && !locationError) { // Avoid fetching if already trying or errored
-            centerCoords = await getUserLocation();
-          }
-
-          if (!centerCoords) {
-            console.warn("Cannot filter by distance: User location unavailable.");
+          } else {
+            let centerCoords = userLocation;
+            if (!centerCoords && !isFetchingLocation && !locationError) {
+              centerCoords = await getUserLocation();
+            }
+  
+            if (!centerCoords) {
+              if (isMounted) {
+                setPosts([]);
+                setLoading(false);
+                setRefreshing(false);
+              }
+              return;
+            }
+  
+            const radiusInMiles = DISTANCE_OPTIONS[currentFilters.distanceRadius].miles;
+            const radiusInKm = radiusInMiles * KM_PER_MILE;
+            const center: [number, number] = [centerCoords.latitude, centerCoords.longitude];
+            const bounds = geohashQueryBounds(center, radiusInKm * 1000);
+  
+            const snapshots = await Promise.all(
+              bounds.map((b) => getDocs(query(collection(db, "posts"), orderBy("geohash"), startAt(b[0]), endAt(b[1]))))
+            );
+  
+            const matchingDocs = snapshots.flatMap(snap => snap.docs);
+            finalPosts = await processPosts(matchingDocs, { ...currentFilters, userInterests }, center);
+  
             if (isMounted) {
-              setPosts([]);
+              setPosts(finalPosts);
               setLoading(false);
               setRefreshing(false);
             }
-            return;
           }
-
-          const radiusInMiles = DISTANCE_OPTIONS[currentFilters.distanceRadius].miles;
-          const radiusInKm = radiusInMiles * KM_PER_MILE;
-          const center: [number, number] = [centerCoords.latitude, centerCoords.longitude];
-          const bounds = geohashQueryBounds(center, radiusInKm * 1000); // meters
-
-          const promises = bounds.map((b) => {
-            const q = query(
-              collection(db, "posts"),
-              orderBy("geohash"),
-              startAt(b[0]),
-              endAt(b[1])
-            );
-            return getDocs(q);
-          });
-
-          const snapshots = await Promise.all(promises);
-          const matchingDocs = snapshots.flatMap(snap => snap.docs);
-          console.log(`Geohash queries returned ${matchingDocs.length} potential docs.`);
-
-          finalPosts = await processPosts(
-            matchingDocs,
-            { ...currentFilters, userInterests }, // Include latest userInterests
-            center
-          );
-
-          if (isMounted) {
-            setPosts(finalPosts);
-            setLoading(false);
-            setRefreshing(false);
-          }
-        }
-      } catch (error) {
-          if (!isMounted) return;
-          console.error("Error in post fetching logic:", error);
-          Alert.alert("Error", "An error occurred while loading events.");
+        } catch (error) {
+          console.error("Post fetch error:", error);
           if (isMounted) {
             setPosts([]);
             setLoading(false);
             setRefreshing(false);
           }
         }
-    };
+      };
   
-    const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
-      console.log("Auth state changed. User:", user ? user.uid : null);
-  
-      if (user) {
-        // User is signed in, setup listeners and fetch data based on current filters
-        if (isMounted) {
-            // Pass the current state of filters
-            setupListenersAndFetch(user.uid, {
-                distanceRadius,
-                selectedCategory,
-                sortOrder,
-                searchText,
-                selectedFee,
-                // userInterests will be fetched by setupListenersAndFetch itself
-            });
-        }
-      } else {
-        // User is signed out, cleanup
-        if (unsubscribeUser) unsubscribeUser();
-        if (unsubscribePosts) unsubscribePosts();
-        unsubscribeUser = null;
-        unsubscribePosts = null;
-        if (isMounted) {
-          console.log("User logged out. Resetting state.");
+      const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
+        if (user && isMounted) {
+          setupListenersAndFetch(user.uid);
+        } else if (isMounted) {
+          if (unsubscribeUser) unsubscribeUser();
+          if (unsubscribePosts) unsubscribePosts();
           setPosts([]);
           setUserInterests([]);
           setSavedPosts([]);
           setUserLocation(null);
           setLocationError(null);
-          setLoading(false); // Set loading false as there's nothing to load
+          setLoading(false);
           setRefreshing(false);
         }
-      }
-    });
-
-    // --- Cleanup Function ---
-    return () => {
-      isMounted = false; // Set flag on unmount
-      console.log("HomeScreen useEffect cleanup.");
-      unsubscribeAuth();
-      if (unsubscribeUser) {
-        console.log("Cleaning up user listener.");
-        unsubscribeUser();
-      }
-      if (unsubscribePosts) {
-        console.log("Cleaning up posts listener.");
-        unsubscribePosts();
-      }
-    };
+      });
   
-  }, [selectedCategory, sortOrder, searchText, userInterests, distanceRadius, selectedFee, getUserLocation]);
+      return () => {
+        isMounted = false;
+        unsubscribeAuth();
+        if (unsubscribeUser) unsubscribeUser();
+        if (unsubscribePosts) unsubscribePosts();
+      };
+    }, [distanceRadius, selectedCategory, sortOrder, searchText, selectedFee, userLocation, getUserLocation])
+  );
+
+  const processPosts = async (
+    docs: any[],
+    filters: {
+      distanceRadius: string;
+      selectedCategory: string;
+      sortOrder: "asc" | "desc";
+      searchText: string;
+      selectedFee: "All" | "Free" | "Paid";
+      userInterests: string[];
+    },
+    centerCoords: [number, number] | null
+  ): Promise<Post[]> => {
+    let posts = docs.map((doc) => ({
+      id: doc.id,
+      ...doc.data(),
+    })) as Post[];
+  
+    // Filter by category
+    if (filters.selectedCategory !== "All") {
+      posts = posts.filter((post) => post.category === filters.selectedCategory);
+    }
+  
+    // Filter by interests (if not "All")
+    if (filters.userInterests?.length > 0) {
+      posts = posts.filter((post) => filters.userInterests.includes(post.category));
+    }
+  
+    // Filter by search text
+    if (filters.searchText.trim() !== "") {
+      const search = filters.searchText.toLowerCase();
+      posts = posts.filter(
+        (post) =>
+          post.title.toLowerCase().includes(search) ||
+          post.description.toLowerCase().includes(search)
+      );
+    }
+  
+    // Filter by fee
+    if (filters.selectedFee === "Free") {
+      posts = posts.filter((post) => post.fee === 0);
+    } else if (filters.selectedFee === "Paid") {
+      posts = posts.filter((post) => post.fee > 0);
+    }
+  
+    // Filter by distance if centerCoords is provided
+    if (centerCoords) {
+      posts = posts.filter((post) => {
+        if (!post.coordinates) return false;
+        const dist = distanceBetween(
+          [post.coordinates.latitude, post.coordinates.longitude],
+          centerCoords
+        );
+        const maxDistance = DISTANCE_OPTIONS[filters.distanceRadius]?.miles || 1000;
+        return dist <= maxDistance * 1.60934 * 1000; // convert miles to meters
+      });
+    }
+  
+    // Sort by date
+    posts.sort((a, b) => {
+      const dateA = a.date instanceof Timestamp ? a.date.toDate() : new Date(a.date);
+      const dateB = b.date instanceof Timestamp ? b.date.toDate() : new Date(b.date);
+      return filters.sortOrder === "asc"
+        ? dateA.getTime() - dateB.getTime()
+        : dateB.getTime() - dateA.getTime();
+    });
+  
+    return posts;
+  };
 
   useFocusEffect(
     useCallback(() => {

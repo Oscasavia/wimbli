@@ -63,7 +63,7 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName={initialRoute}
-          screenOptions={{ headerShown: false }}
+          screenOptions={{ headerShown: false, animation: 'none', gestureEnabled: false, }}
         >
           <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />

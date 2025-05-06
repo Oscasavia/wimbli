@@ -267,7 +267,20 @@ export default function SavedEventsScreen() {
     // Empty State
     if (!loading && savedEvents.length === 0) {
          return (
-            <SafeAreaView style={[styles.centerContainer, { backgroundColor: currentTheme.background }]}>
+            <SafeAreaView style={[styles.screen, { backgroundColor: inputBackgroundColor }]}>
+            <StatusBar
+            translucent={false}
+            backgroundColor={cardBackgroundColor}
+            barStyle={isDark ? "light-content" : "dark-content"}
+            />
+            <View style={[styles.screen, { backgroundColor: currentTheme.background }]}>
+               {/* Screen Title */}
+               <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+                <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+                    Saved Events
+                </Text>
+               </View>
+               <View style={[styles.screenB, { backgroundColor: currentTheme.background}]}>
                 <MaterialCommunityIcons name="bookmark-off-outline" size={60} color={currentTheme.textSecondary} />
                 <Text style={[styles.emptyTitle, { color: currentTheme.textPrimary }]}>No Saved Events</Text>
                 <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
@@ -276,6 +289,8 @@ export default function SavedEventsScreen() {
                  <TouchableOpacity onPress={() => navigation.navigate("Main")}>
                      <Text style={[styles.discoverLink, { color: currentTheme.primary }]}>Browse Events</Text>
                  </TouchableOpacity>
+            </View>
+            </View>
             </SafeAreaView>
         );
     }
@@ -312,6 +327,11 @@ export default function SavedEventsScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
+  },
+  screenB: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: 'center',
   },
   headerContainer: {
         flexDirection: "row",
