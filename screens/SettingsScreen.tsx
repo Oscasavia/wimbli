@@ -97,15 +97,15 @@ export default function SettingsScreen() {
     const uid = user.uid; // Get UID before potentially deleting user
 
     try {
-       console.log(`Attempting to delete Firestore doc for UID: ${uid}`);
+      //  console.log(`Attempting to delete Firestore doc for UID: ${uid}`);
        // 1. Delete Firestore data first (or relevant associated data)
        await deleteDoc(doc(db, "users", uid));
-       console.log(`Firestore doc deleted for UID: ${uid}`);
+      //  console.log(`Firestore doc deleted for UID: ${uid}`);
 
        // 2. Delete Firebase Auth user
-       console.log(`Attempting to delete Auth user for UID: ${uid}`);
+      //  console.log(`Attempting to delete Auth user for UID: ${uid}`);
        await deleteUser(user);
-       console.log(`Auth user deleted for UID: ${uid}`);
+      //  console.log(`Auth user deleted for UID: ${uid}`);
 
        Alert.alert("Account Deleted", "Your account has been successfully deleted.");
        // Navigation likely handled by root navigator listening to auth state change
@@ -361,13 +361,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   scrollContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 25, // Space below header
+    paddingHorizontal: 12,
+    paddingTop: 15, // Space below header
     paddingBottom: 30,
   },
   // Removed custom title style
   section: {
-     marginBottom: 25, // Space between sections
+     marginBottom: 15, // Space between sections
   },
   sectionHeader: {
      fontSize: 14,

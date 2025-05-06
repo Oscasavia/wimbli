@@ -18,6 +18,9 @@ import {
   onSnapshot,
   query,
   where,
+  getDocs,
+  arrayRemove,
+  updateDoc,
   Timestamp, // Import Timestamp for date handling
 } from "firebase/firestore";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -114,6 +117,7 @@ export default function ManagePostsScreen() {
             try {
                // Optional: Add visual feedback during deletion
                await deleteDoc(doc(db, "posts", id));
+               await removeDeletedPostFromSaved(id);
                // No need to manually remove from state, onSnapshot listener handles it
                // Alert.alert("Success", "Post deleted."); // Optional success message
             } catch (error) {
@@ -124,6 +128,23 @@ export default function ManagePostsScreen() {
         },
       ]
     );
+  };
+
+  const removeDeletedPostFromSaved = async (deletedPostId: string) => {
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("savedPosts", "array-contains", deletedPostId));
+      const snapshot = await getDocs(q);
+  
+      for (const docSnap of snapshot.docs) {
+        await updateDoc(docSnap.ref, {
+          savedPosts: arrayRemove(deletedPostId),
+        });
+        console.log(`✅ Removed post ${deletedPostId} from user ${docSnap.id}`);
+      }
+    } catch (error) {
+      console.error("❌ Error removing deleted post from savedPosts:", error);
+    }
   };
 
   // --- Render Post Item ---

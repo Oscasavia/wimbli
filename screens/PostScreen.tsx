@@ -148,7 +148,7 @@ export default function PostScreen() {
                 longitude: locationData.coords.longitude,
             });
         } catch (error) {
-            console.error("Error getting location:", error);
+            // console.error("Error getting location:", error);
             Alert.alert("Location Error", "Could not retrieve your location.");
         }
     };

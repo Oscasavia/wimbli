@@ -94,7 +94,7 @@ export default function InterestsScreen() {
         style={[
           styles.chipContainer,
           {
-            backgroundColor: isSelected ? selectedChipBgColor : chipBackgroundColor,
+            backgroundColor: isSelected ? selectedChipBgColor : cardBackgroundColor,
             borderColor: isSelected ? selectedChipBgColor : chipBorderColor,
           },
         ]}

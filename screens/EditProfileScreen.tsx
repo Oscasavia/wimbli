@@ -392,11 +392,11 @@ const styles = StyleSheet.create({
   scrollContainer: {
     paddingHorizontal: 20,
     paddingTop: 20,
-    paddingBottom: 50, // Ensure space below button
+    paddingBottom: 30, // Ensure space below button
   },
   avatarSection: {
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
   },
   avatarTouchable: {
     position: 'relative', // Needed for absolute positioning of icon overlay
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   formSection: {
-    marginBottom: 20,
+    marginBottom: 10,
   },
   label: {
     fontSize: 16,
@@ -445,7 +445,6 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderRadius: 10, // Consistent border radius
     fontSize: 16,
-    // Background, text, and border colors set dynamically
   },
   textArea: {
     height: 120, // Taller text area
@@ -461,7 +460,6 @@ const styles = StyleSheet.create({
   chipContainer: {
     flexDirection: "row",
     flexWrap: "wrap",
-    // marginVertical: 10, // Removed as padding is in wrapper now
   },
   chip: {
     flexDirection: 'row', // For icon + text
@@ -470,8 +468,12 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 20,
     margin: 5, // Spacing between chips
-    borderWidth: 1,
+    borderWidth: 0,
     // Background and border colors set dynamically
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   chipIcon: {
     marginRight: 5,
@@ -481,10 +483,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     // Color set dynamically
   },
-  // selectedChip: { // Styles merged into chip's dynamic styling
-  // },
-  // selectedChipText: { // Styles merged into chipText's dynamic styling
-  // },
   saveButton: {
     paddingVertical: 15,
     borderRadius: 25, // Match edit profile button style

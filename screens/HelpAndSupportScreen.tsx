@@ -9,7 +9,8 @@ import {
     TouchableOpacity,
     Linking,
     Platform,
-    Alert
+    Alert,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context'; // Use safe area
 import { useNavigation } from '@react-navigation/native';
@@ -89,11 +90,13 @@ export default function HelpAndSupportScreen() {
       ) => {
 
       const rowStyles = [
-          styles.settingRow, // Reuse settingRow style name
+          styles.settingRow,
           { backgroundColor: cardBackgroundColor },
           isFirstInSection && styles.firstRow,
           isLastInSection && styles.lastRow,
           !isLastInSection && { borderBottomColor: separatorColor, borderBottomWidth: StyleSheet.hairlineWidth },
+          // Add shadow styles if desired for card look
+          styles.cardShadow, { shadowColor }
       ];
       const content = (
           <View style={rowStyles}>
@@ -118,6 +121,17 @@ export default function HelpAndSupportScreen() {
     return (
         // Use SafeAreaView WITHOUT edges prop for default top/bottom padding
         <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+                        <StatusBar
+                          translucent={false}
+                          backgroundColor={cardBackgroundColor}
+                          barStyle={isDark ? "light-content" : "dark-content"}
+                        />
+                        <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+                                 {/* Screen Title */}
+                                 <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+                                    Help And Support
+                                 </Text>
+                                </View>
             <ScrollView contentContainerStyle={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
                 {/* == Section: FAQs == */}
@@ -187,34 +201,56 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
   },
+  headerContainer: {
+          flexDirection: "row",
+          alignItems: "center",
+          justifyContent: 'center',
+          paddingHorizontal: 15,
+          paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+          paddingBottom: 10,
+          // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+          borderBottomWidth: 1,
+          borderBottomColor: 'transparent', // Use theme border
+          ...Platform.select({
+            ios: {
+              shadowColor: '#000',
+              shadowOffset: { width: 0, height: 3 },
+              shadowOpacity: 0.12,
+              shadowRadius: 6,
+            },
+            android: {
+              elevation: 6,
+            },
+          }),
+          zIndex: 10, // Ensures it stays above the list in case of overlap
+        },
+        screenTitle: {
+        fontSize: 24,
+      fontWeight: "bold",
+      textAlign: "center",
+      marginVertical: 15, // Add vertical margin for spacing
+      paddingHorizontal: 20, // Ensure padding if text wraps
+      marginTop: '1.9%',
+      marginBottom: 4,
+        },
   scrollContainer: {
-    paddingHorizontal: 0, // Let sections handle horizontal margin
-    paddingTop: 25,
+    paddingHorizontal: 12,
+    paddingTop: 15, // Space below header
     paddingBottom: 30,
   },
+  cardShadow: { // Optional shadow for card look
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
+   },
   section: {
-     marginBottom: 25,
-     marginHorizontal: 16,
-     borderRadius: 12,
-     overflow: 'hidden',
-     // Add shadow like SettingsScreen if desired (optional)
-      // shadowColor: "#000", // Use shadowColor variable
-      // shadowOffset: { width: 0, height: 1 },
-      // shadowOpacity: 0.08,
-      // shadowRadius: 3,
-      // elevation: 2,
-     // Apply border if shadow isn't prominent enough, especially in dark mode
-     // borderWidth: StyleSheet.hairlineWidth,
-     // borderColor: separatorColor, // Use theme separator color for border
+     marginBottom: 15,
   },
   sectionHeader: {
      fontSize: 14,
      fontWeight: '600',
      textTransform: 'uppercase',
-     // color set dynamically
-    //  paddingHorizontal: 15, // Indent header to align with row content
-    //  paddingTop: 15,
-    //  paddingBottom: 8,
      marginBottom: 8,
      // backgroundColor: currentTheme.background, // Match screen background if needed for spacing illusion
      opacity: 0.8,
@@ -229,14 +265,15 @@ const styles = StyleSheet.create({
     minHeight: 50,
     // backgroundColor set dynamically (cardBackground)
   },
-   firstRow: {
-     borderTopRightRadius: 12,
-     borderTopLeftRadius: 12,
-   },
-   lastRow: {
-      // Removed - Radius now on section
-     borderBottomWidth: 0, // No bottom border on the last item within the section view
-   },
+  firstRow: {
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  lastRow: {
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
+     borderBottomWidth: 0, // No bottom border on the last item
+  },
   settingLeft: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -264,8 +301,10 @@ const styles = StyleSheet.create({
   faqItem: {
       paddingVertical: 15,
       paddingHorizontal: 15,
-      // backgroundColor set dynamically
-      // Borders/Radius applied conditionally in map function
+      shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   faqQuestion: {
       fontSize: 16,

@@ -1,7 +1,7 @@
 // screens/AboutAppScreen.tsx
 
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Image, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation } from '@react-navigation/native';
 import { useTheme } from '../ThemeContext'; // Adjust path if needed
@@ -15,6 +15,7 @@ export default function AboutAppScreen() {
     const currentTheme = isDark ? darkTheme : lightTheme;
     const [appVersion, setAppVersion] = useState<string | null>(null);
     const [appName, setAppName] = useState<string | null>(null);
+    const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
 
     // Set Header Title
     useEffect(() => {
@@ -31,6 +32,17 @@ export default function AboutAppScreen() {
     return (
         // Use SafeAreaView for padding respecting notches/status bars
         <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+                <StatusBar
+                  translucent={false}
+                  backgroundColor={cardBackgroundColor}
+                  barStyle={isDark ? "light-content" : "dark-content"}
+                />
+                <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+                         {/* Screen Title */}
+                         <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+                            About App
+                         </Text>
+                        </View>
             <ScrollView contentContainerStyle={styles.scrollContainer}>
 
                 {/* Logo Area */}
@@ -85,6 +97,38 @@ const styles = StyleSheet.create({
     screenContainer: {
         flex: 1,
     },
+    headerContainer: {
+        flexDirection: "row",
+        alignItems: "center",
+        justifyContent: 'center',
+        paddingHorizontal: 15,
+        paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+        paddingBottom: 10,
+        // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+        borderBottomWidth: 1,
+        borderBottomColor: 'transparent', // Use theme border
+        ...Platform.select({
+          ios: {
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 3 },
+            shadowOpacity: 0.12,
+            shadowRadius: 6,
+          },
+          android: {
+            elevation: 6,
+          },
+        }),
+        zIndex: 10, // Ensures it stays above the list in case of overlap
+      },
+      screenTitle: {
+      fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginVertical: 15, // Add vertical margin for spacing
+    paddingHorizontal: 20, // Ensure padding if text wraps
+    marginTop: '1.9%',
+    marginBottom: 4,
+      },
     scrollContainer: {
         flexGrow: 1, // Ensure content can fill space if short, or scroll if long
         justifyContent: 'center', // Center content vertically

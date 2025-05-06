@@ -14,7 +14,7 @@ import {
   Pressable,
 } from "react-native";
 import { auth, db } from "../firebase";
-import { doc, getDoc, collection, query, where, getCountFromServer } from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
+import { doc, getDocs, collection, query, where, getCountFromServer, onSnapshot, arrayRemove, updateDoc, deleteDoc} from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -58,53 +58,48 @@ export default function ProfileScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      const fetchUserAndCounts = async () => {
-        setLoading(true); // Show loader when focus changes
-        setPostCount(0); // Reset count on focus
-        setSavedEventsCount(0);
-        try {
-          const uid = userId || auth.currentUser?.uid;
-          if (!uid) {
-            console.log("No UID found");
-            setLoading(false);
-            return;
-          }
+      let unsubscribeUser: () => void;
+let unsubscribePosts: () => void;
 
-          // --- Fetch User Data ---
-        const userDocSnap = await getDoc(doc(db, "users", uid));
-        let fetchedUserData: any = null; // Temp variable to hold data
+const fetchUserAndCounts = async () => {
+  setLoading(true);
+  setPostCount(0);
+  setSavedEventsCount(0);
 
-        if (userDocSnap.exists()) {
-          fetchedUserData = userDocSnap.data();
-          setUserData(fetchedUserData);
-        } else {
-          console.log("No user data found in Firestore for UID:", uid);
-          fetchedUserData = { /* fallback data */ };
-          setUserData(fetchedUserData);
-        }
-        // --- END Fetch User Data ---
+  try {
+    const uid = userId || auth.currentUser?.uid;
+    if (!uid) {
+      console.log("No UID found");
+      setLoading(false);
+      return;
+    }
 
-        // --- Calculate Saved Events Count ---
-        // *** IMPORTANT: Ensure 'savedPosts' is the correct field name in your Firestore user document ***
-        const savedIds = fetchedUserData?.savedPosts || [];
+    // 🔁 Real-time listener for user data (e.g. saved posts)
+    unsubscribeUser = onSnapshot(doc(db, "users", uid), (docSnap) => {
+      if (docSnap.exists()) {
+        const data = docSnap.data();
+        setUserData(data);
+
+        const savedIds = data.savedPosts || [];
         setSavedEventsCount(savedIds.length);
-        console.log(`Saved events count for ${uid}: ${savedIds.length}`);
-        // --- END Calculate Saved Events Count ---
-
-        // --- Query for Post Count (existing code) ---
-        const postsRef = collection(db, "posts");
-        const q = query(postsRef, where("createdBy", "==", uid));
-        const countSnapshot = await getCountFromServer(q);
-        setPostCount(countSnapshot.data().count);
-        console.log(`Post count for ${uid}: ${countSnapshot.data().count}`);
-        // --- END Query for Post Count ---
-
-      } catch (error) {
-        console.error("Error loading profile data/counts:", error);
-      } finally {
-        setLoading(false);
+        console.log(`✅ Real-time saved count: ${savedIds.length}`);
       }
-    };
+    });
+
+    // 🔁 Real-time listener for user-created posts
+    const postsRef = collection(db, "posts");
+    const postsQuery = query(postsRef, where("createdBy", "==", uid));
+    unsubscribePosts = onSnapshot(postsQuery, (snapshot) => {
+      setPostCount(snapshot.size);
+      console.log(`✅ Real-time post count: ${snapshot.size}`);
+    });
+
+  } catch (error) {
+    console.error("Error loading profile data/counts:", error);
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchUserAndCounts();
       // Clean-up function (optional)
@@ -135,6 +130,38 @@ export default function ProfileScreen() {
       saved: savedEventsCount,
       followers: userData?.followerCount || 0,
       following: userData?.followingCount || 0,
+  };
+
+  const handleDeletePost = async (postId: string) => {
+    try {
+      // Delete the post from Firestore
+      await deleteDoc(doc(db, "posts", postId));
+  
+      // Remove the post ID from every user's savedPosts
+      await removeDeletedPostFromSaved(postId);
+  
+      Alert.alert("Deleted!", "Your post was removed.");
+    } catch (error) {
+      console.error("Failed to delete post:", error);
+      Alert.alert("Error", "Could not delete post.");
+    }
+  };
+
+  const removeDeletedPostFromSaved = async (deletedPostId: string) => {
+    try {
+      const usersRef = collection(db, "users");
+      const q = query(usersRef, where("savedPosts", "array-contains", deletedPostId));
+      const snapshot = await getDocs(q);
+  
+      for (const docSnap of snapshot.docs) {
+        await updateDoc(docSnap.ref, {
+          savedPosts: arrayRemove(deletedPostId),
+        });
+        console.log(`✅ Removed post ${deletedPostId} from user ${docSnap.id}`);
+      }
+    } catch (error) {
+      console.error("❌ Error removing deleted post from savedPosts:", error);
+    }
   };
 
 
