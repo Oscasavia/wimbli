@@ -6,6 +6,7 @@ import {
   StyleSheet,
   FlatList,
   Alert,
+  StatusBar,
   SafeAreaView, // Use SafeAreaView
   ActivityIndicator, // Added for loading
   Platform,
@@ -36,6 +37,7 @@ export default function InterestsScreen() {
 
   // --- Theme variable fallbacks ---
   const chipBackgroundColor = currentTheme.chipBackground || (isDark ? '#3a3a3c' : '#e5e5e5');
+  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
   const chipBorderColor = currentTheme.inputBorder || (isDark ? '#555' : '#ccc');
   const chipTextColor = currentTheme.textSecondary || (isDark ? '#ccc' : '#555');
   const selectedChipBgColor = currentTheme.primary || '#007AFF';
@@ -115,10 +117,15 @@ export default function InterestsScreen() {
   return (
      // Use SafeAreaView for top/bottom padding
     <SafeAreaView style={[styles.safeAreaContainer, { backgroundColor: currentTheme.background }]}>
-        <View style={styles.container}>
-            <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Select Your Interests</Text>
-            <Text style={[styles.subtitle, { color: currentTheme.textSecondary }]}>Choose a few things you like. This helps us find relevant events for you.</Text>
-
+      <StatusBar
+            translucent={false}
+            backgroundColor={cardBackgroundColor}
+            barStyle={isDark ? "light-content" : "dark-content"}
+          />
+            <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
+              <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Select Your Interests</Text>
+              <Text style={[styles.subtitle, { color: currentTheme.textSecondary }]}>Choose a few things you like. This helps us find relevant events for you.</Text>
+            </View>
             <FlatList
                 data={INTEREST_OPTIONS}
                 renderItem={renderInterestChip}
@@ -154,7 +161,6 @@ export default function InterestsScreen() {
             >
                 <Text style={[styles.skipText, { color: currentTheme.textSecondary }]}>Skip for now</Text>
             </TouchableOpacity>
-        </View>
     </SafeAreaView>
   );
 }
@@ -170,6 +176,29 @@ const styles = StyleSheet.create({
     paddingTop: 40, // Space from top safe area
     paddingBottom: 15, // Space from bottom safe area
   },
+  headerContainer: {
+    // flexDirection: "row",
+    alignItems: "center",
+    justifyContent: 'center',
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: 'transparent', // Use theme border
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
+  },
   title: {
     fontSize: 26, // Adjusted size
     fontWeight: 'bold',
@@ -180,7 +209,7 @@ const styles = StyleSheet.create({
   subtitle: {
      fontSize: 16,
      textAlign: 'center',
-     marginBottom: 25, // Space below subtitle
+     marginBottom: 5, // Space below subtitle
      lineHeight: 22,
      // color set dynamically
   },
@@ -192,12 +221,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row', // For icon + text
     alignItems: 'center',
     justifyContent: 'center', // Center content within chip
-    borderWidth: 1.5, // Slightly thicker border
+    borderWidth: 0, // Slightly thicker border
     margin: 6, // Adjust spacing between chips
     paddingVertical: 10, // Adjust padding
     paddingHorizontal: 12,
     borderRadius: 20, // Rounded chips
     // Dynamic backgroundColor, borderColor
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 3,
   },
   // selectedChipContainer: { // Combined into conditional style
   // },
