@@ -35,15 +35,33 @@ import { lightTheme, darkTheme } from "../themeColors";
 import { Picker } from "@react-native-picker/picker";
 // Removed LinearGradient import
 import { Feather } from "@expo/vector-icons"; // Use Feather for icons
-import * as Location from 'expo-location'; // Import for location services
+import * as Location from "expo-location"; // Import for location services
 import { geohashForLocation } from "geofire-common"; // Import the geohash function
 
 // Assuming INTEREST_OPTIONS remains the same
 const INTEREST_OPTIONS = [
-  "Poetry", "Tennis", "Coding", "Volunteering", "Live Music", "Book Clubs",
-  "Photography", "Dancing", "Spirituality", "Outdoor Events", "Art", "Sports",
-  "Games", "Electronics", "Automotive", "Garden", "Academics", "Medical",
-  "Beauty", "Pet", "Food", "Clothes",
+  "Poetry",
+  "Tennis",
+  "Coding",
+  "Volunteering",
+  "Live Music",
+  "Book Clubs",
+  "Photography",
+  "Dancing",
+  "Spirituality",
+  "Outdoor Events",
+  "Art",
+  "Sports",
+  "Games",
+  "Electronics",
+  "Automotive",
+  "Garden",
+  "Academics",
+  "Medical",
+  "Beauty",
+  "Pet",
+  "Food",
+  "Clothes",
 ];
 
 export default function PostScreen() {
@@ -58,17 +76,24 @@ export default function PostScreen() {
   const [date, setDate] = useState(new Date());
   const [fee, setFee] = useState(""); // Keep as string for input, parse on save
   const [isLoading, setIsLoading] = useState(false); // Saving state
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
-  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
-  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
-  const cardBorderColor = currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
-  const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const inputBackgroundColor =
+    currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const cardBorderColor =
+    currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const inputBorderColor =
+    currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
   const shadowColor = currentTheme.shadowColor || "#000";
 
@@ -83,30 +108,33 @@ export default function PostScreen() {
       setFee(editPost.fee?.toString() || ""); // Ensure fee is string for input
       // Handle date conversion safely (Firestore timestamp or ISO string)
       try {
-           // Check if it's a Firestore Timestamp object
-          if (editPost.date && typeof editPost.date.toDate === 'function') {
-              setDate(editPost.date.toDate());
-          }
-          // Check if it's an ISO string
-          else if (editPost.date && typeof editPost.date === 'string') {
-              const parsedDate = new Date(editPost.date);
-              if (!isNaN(parsedDate.getTime())) { // Check if parsing was successful
-                 setDate(parsedDate);
-              } else {
-                 console.warn("Invalid date string received for edit:", editPost.date);
-                 setDate(new Date()); // Fallback to current date
-              }
+        // Check if it's a Firestore Timestamp object
+        if (editPost.date && typeof editPost.date.toDate === "function") {
+          setDate(editPost.date.toDate());
+        }
+        // Check if it's an ISO string
+        else if (editPost.date && typeof editPost.date === "string") {
+          const parsedDate = new Date(editPost.date);
+          if (!isNaN(parsedDate.getTime())) {
+            // Check if parsing was successful
+            setDate(parsedDate);
           } else {
-              setDate(new Date()); // Fallback if date is missing or invalid type
+            console.warn(
+              "Invalid date string received for edit:",
+              editPost.date
+            );
+            setDate(new Date()); // Fallback to current date
           }
+        } else {
+          setDate(new Date()); // Fallback if date is missing or invalid type
+        }
       } catch (error) {
-         console.error("Error parsing editPost date:", error);
-         setDate(new Date()); // Fallback on error
+        console.error("Error parsing editPost date:", error);
+        setDate(new Date()); // Fallback on error
       }
-
     } else {
-       // Reset fields when navigating to create (also handled by useFocusEffect)
-       resetFormFields();
+      // Reset fields when navigating to create (also handled by useFocusEffect)
+      resetFormFields();
     }
   }, [editPost]); // Rerun effect if editPost changes
 
@@ -122,35 +150,38 @@ export default function PostScreen() {
   );
 
   useFocusEffect(
-      useCallback(() => {
-        StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
-        if (Platform.OS === "android") {
-          StatusBar.setBackgroundColor(cardBackgroundColor, true);
-        }
-      }, [isDark, cardBackgroundColor])
-    );
+    useCallback(() => {
+      StatusBar.setBarStyle(isDark ? "light-content" : "dark-content", true);
+      if (Platform.OS === "android") {
+        StatusBar.setBackgroundColor(cardBackgroundColor, true);
+      }
+    }, [isDark, cardBackgroundColor])
+  );
 
   // Get user's location on component mount
   useEffect(() => {
     const getLocation = async () => {
-        try {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-                Alert.alert('Location Permission Required', 'Please enable location services to use this feature.');
-                return;
-            }
-
-            const locationData = await Location.getCurrentPositionAsync({
-                accuracy: Location.Accuracy.High,
-            });
-            setUserLocation({
-                latitude: locationData.coords.latitude,
-                longitude: locationData.coords.longitude,
-            });
-        } catch (error) {
-            // console.error("Error getting location:", error);
-            Alert.alert("Location Error", "Could not retrieve your location.");
+      try {
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== "granted") {
+          Alert.alert(
+            "Location Permission Required",
+            "Please enable location services to use this feature."
+          );
+          return;
         }
+
+        const locationData = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.High,
+        });
+        setUserLocation({
+          latitude: locationData.coords.latitude,
+          longitude: locationData.coords.longitude,
+        });
+      } catch (error) {
+        // console.error("Error getting location:", error);
+        Alert.alert("Location Error", "Could not retrieve your location.");
+      }
     };
 
     getLocation();
@@ -171,38 +202,54 @@ export default function PostScreen() {
     const trimmedTitle = title.trim();
     const trimmedDescription = description.trim();
     const trimmedLocation = location.trim();
-  
-    if (!trimmedTitle || !trimmedDescription || !category || !trimmedLocation || !date) {
-      Alert.alert("Missing Information", "Please fill out title, description, category, location, and date.");
+
+    if (
+      !trimmedTitle ||
+      !trimmedDescription ||
+      !category ||
+      !trimmedLocation ||
+      !date
+    ) {
+      Alert.alert(
+        "Missing Information",
+        "Please fill out title, description, category, location, and date."
+      );
       return;
     }
-  
+
     const currentUser = auth.currentUser;
     if (!currentUser) {
       Alert.alert("Error", "You must be logged in to post.");
       return;
     }
-  
+
     setIsLoading(true);
 
     // Ensure userLocation is available before proceeding
-   if (!userLocation) {
-    Alert.alert("Location Missing", "Could not retrieve location. Cannot save post with geospatial data.");
-    setIsLoading(false); // Stop loading
-    return; // Prevent saving without location
-  }
+    if (!userLocation) {
+      Alert.alert(
+        "Location Missing",
+        "Could not retrieve location. Cannot save post with geospatial data."
+      );
+      setIsLoading(false); // Stop loading
+      return; // Prevent saving without location
+    }
 
     try {
       // Fetch the user's profile picture URL
       const userDoc = await getDoc(doc(db, "users", currentUser.uid));
-      const creatorProfilePic = userDoc.data()?.profilePicture || currentUser.photoURL || null;
+      const creatorProfilePic =
+        userDoc.data()?.profilePicture || currentUser.photoURL || null;
 
       // --- Create GeoPoint and Geohash ---
-     const coords = { latitude: userLocation.latitude, longitude: userLocation.longitude };
-     const hash = geohashForLocation([coords.latitude, coords.longitude]);
-     const point = new GeoPoint(coords.latitude, coords.longitude);
-     // --- ---
-  
+      const coords = {
+        latitude: userLocation.latitude,
+        longitude: userLocation.longitude,
+      };
+      const hash = geohashForLocation([coords.latitude, coords.longitude]);
+      const point = new GeoPoint(coords.latitude, coords.longitude);
+      // --- ---
+
       const postData = {
         title: trimmedTitle,
         description: trimmedDescription,
@@ -214,19 +261,23 @@ export default function PostScreen() {
         creatorUsername: currentUser.displayName || "Unknown User", // Add username for display
         creatorProfilePic: creatorProfilePic, // Include profile picture URL
         // --- Store GeoPoint and Geohash ---
-       coordinates: point,   // Store location as GeoPoint
-       geohash: hash,        // Store the calculated geohash
+        coordinates: point, // Store location as GeoPoint
+        geohash: hash, // Store the calculated geohash
         // latitude: userLocation?.latitude || null,  // Store latitude
         // longitude: userLocation?.longitude || null, // Store longitude
       };
-  
+
       if (editPost && editPost.id) {
         // Update existing post
         const postRef = doc(db, "posts", editPost.id);
-        await setDoc(postRef, {
-          ...postData,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
+        await setDoc(
+          postRef,
+          {
+            ...postData,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true }
+        );
         Alert.alert("Success", "Your post has been updated.");
       } else {
         // Create new post
@@ -236,9 +287,8 @@ export default function PostScreen() {
         });
         Alert.alert("Success", "Your post has been created.");
       }
-  
+
       navigation.goBack();
-  
     } catch (error: any) {
       console.error("Error saving post:", error);
       Alert.alert("Error", `Failed to save post: ${error.message}`);
@@ -248,7 +298,10 @@ export default function PostScreen() {
   };
 
   // --- Date/Time Picker Logic (Android Specific) ---
-  const showDateTimePicker = (mode: 'date' | 'time', dateFromDatepicker?: Date) => {
+  const showDateTimePicker = (
+    mode: "date" | "time",
+    dateFromDatepicker?: Date
+  ) => {
     // Use the date selected from the date picker if provided, otherwise use current state
     const currentDateValue = dateFromDatepicker || date;
 
@@ -256,17 +309,16 @@ export default function PostScreen() {
       value: currentDateValue, // Use the potentially updated date
       onChange: (event, selectedValue) => {
         // Check if a value was actually selected ('set' event)
-        if (event.type === 'set' && selectedValue) {
+        if (event.type === "set" && selectedValue) {
           const selectedDateOrTime = new Date(selectedValue);
 
-          if (mode === 'date') {
+          if (mode === "date") {
             // User just picked a DATE.
             // The selectedValue contains the correct date, but potentially wrong time (often midnight UTC or current time)
             console.log("Date selected (raw):", selectedDateOrTime);
             // IMPORTANT: Don't set the state here yet.
             // Call the time picker, passing the DATE the user just selected.
-            showDateTimePicker('time', selectedDateOrTime); // Pass the selected date object
-
+            showDateTimePicker("time", selectedDateOrTime); // Pass the selected date object
           } else {
             // User just picked a TIME.
             // `currentDateValue` here holds the date the user picked in the previous step.
@@ -284,8 +336,8 @@ export default function PostScreen() {
             setDate(finalDate); // Update the state with the CORRECT combined date and time
           }
         } else {
-           console.log(`Picker ${mode} dismissed or no value set.`);
-           // Handle dismissal - maybe do nothing or show a message
+          console.log(`Picker ${mode} dismissed or no value set.`);
+          // Handle dismissal - maybe do nothing or show a message
         }
       },
       mode: mode,
@@ -295,144 +347,283 @@ export default function PostScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: currentTheme.background }]}
+    >
       <StatusBar
         translucent={false}
         backgroundColor={cardBackgroundColor}
         barStyle={isDark ? "light-content" : "dark-content"}
       />
-        <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
-         {/* Screen Title */}
-         <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
-            {editPost ? "Edit Event Post" : "Create New Event Post"}
-         </Text>
-        </View>
+      <View
+        style={[
+          styles.headerContainer,
+          { backgroundColor: cardBackgroundColor },
+        ]}
+      >
+        {/* Screen Title */}
+        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+          {editPost ? "Edit Event Post" : "Create New Event Post"}
+        </Text>
+      </View>
 
-        <ScrollView
-           contentContainerStyle={styles.scrollContainer}
-           keyboardShouldPersistTaps="handled"
-           showsVerticalScrollIndicator={false}
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: cardBackgroundColor,
+              borderColor: cardBorderColor,
+              shadowColor: shadowColor,
+            },
+          ]}
         >
-          <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
-           {/* Title Input */}
+          {/* Title Input */}
 
-           
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Event Title</Text>
-           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <TextInput
-             placeholder="Enter the title of your event"
-             value={title}
-             onChangeText={setTitle}
-             style={[styles.input, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
-             placeholderTextColor={placeholderTextColor}
-             maxLength={100}
-           />
-           </View>
-
-           {/* Description Input */}
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Description</Text>
-           <View style={[styles.textAreaContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <TextInput
-             placeholder="Describe your event"
-             value={description}
-             onChangeText={setDescription}
-             style={[styles.input, styles.textArea, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
-             multiline
-             placeholderTextColor={placeholderTextColor}
-             maxLength={500}
-           />
-           </View>
-
-           {/* Location Input */}
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Location</Text>
-           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <TextInput
-             placeholder="e.g., Millennium Park, Online"
-             value={location}
-             onChangeText={setLocation}
-             style={[styles.input, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
-             placeholderTextColor={placeholderTextColor}
-             maxLength={150}
-           />
-           </View>
-
-           {/* Category Picker */}
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Category</Text>
-           <View style={[styles.pickerContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-             <Picker
-               selectedValue={category}
-               onValueChange={(itemValue) => setCategory(itemValue || "")}
-               style={[styles.picker, { color: currentTheme.textPrimary }]}
-               dropdownIconColor={currentTheme.textPrimary} // Style dropdown icon color
-               prompt="Select a category" // Android only: Title for the picker dialog
-               // itemStyle={{ color: currentTheme.textPrimary }} // iOS only: style for picker items (use carefully)
-             >
-               <Picker.Item label="-- Select a Category --" value="" style={{ color: placeholderTextColor }} />
-               {INTEREST_OPTIONS.map((option) => (
-                 <Picker.Item key={option} label={option} value={option} />
-               ))}
-             </Picker>
-           </View>
-
-           {/* Fee Input */}
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Fee ($)</Text>
-           <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <TextInput
-             placeholder="e.g., 10.50 (or leave blank for free)"
-             value={fee}
-             onChangeText={setFee}
-             keyboardType="decimal-pad" // Use decimal pad for currency
-             style={[styles.input, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
-             placeholderTextColor={placeholderTextColor}
-           />
-           </View>
-
-           {/* Date & Time Picker Trigger */}
-           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>Date & Time</Text>
-           <View style={[styles.dateTriggerContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <TouchableOpacity
-              onPress={() => showDateTimePicker('date')} // Start with date picker
-              style={[styles.input, styles.dateTrigger, inputStyle(currentTheme, inputBackgroundColor, inputBorderColor)]}
-           >
-             <Text style={[styles.dateTriggerText, { color: currentTheme.textPrimary }]}>
-               {date.toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}
-             </Text>
-             <Feather name="calendar" size={20} color={currentTheme.textSecondary} />
-           </TouchableOpacity>
-           </View>
-
-           {/* Submit Button */}
-           <TouchableOpacity
-             onPress={handlePost}
-             disabled={isLoading}
-             style={[
-               styles.submitButton,
-               { backgroundColor: currentTheme.primary, shadowColor: shadowColor },
-               isLoading && styles.submitButtonDisabled
-             ]}
-           >
-             {isLoading ? (
-               <ActivityIndicator size="small" color={currentTheme.buttonText || '#fff'} />
-             ) : (
-               <Text style={[styles.submitButtonText, { color: currentTheme.buttonText || '#fff' }]}>
-                 {editPost ? "Update Post" : "Create Post"}
-               </Text>
-             )}
-           </TouchableOpacity>
-
-           {/* Spacer at bottom */}
-           <View style={{ height: 50 }} />
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Event Title
+          </Text>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <TextInput
+              placeholder="Enter the title of your event"
+              value={title}
+              onChangeText={setTitle}
+              style={[
+                styles.input,
+                inputStyle(
+                  currentTheme,
+                  inputBackgroundColor,
+                  inputBorderColor
+                ),
+              ]}
+              placeholderTextColor={placeholderTextColor}
+              maxLength={100}
+            />
           </View>
-        </ScrollView>
+
+          {/* Description Input */}
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Description
+          </Text>
+          <View
+            style={[
+              styles.textAreaContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <TextInput
+              placeholder="Describe your event"
+              value={description}
+              onChangeText={setDescription}
+              style={[
+                styles.input,
+                styles.textArea,
+                inputStyle(
+                  currentTheme,
+                  inputBackgroundColor,
+                  inputBorderColor
+                ),
+              ]}
+              multiline
+              placeholderTextColor={placeholderTextColor}
+              maxLength={500}
+            />
+          </View>
+
+          {/* Location Input */}
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Location
+          </Text>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <TextInput
+              placeholder="e.g., Millennium Park, Online"
+              value={location}
+              onChangeText={setLocation}
+              style={[
+                styles.input,
+                inputStyle(
+                  currentTheme,
+                  inputBackgroundColor,
+                  inputBorderColor
+                ),
+              ]}
+              placeholderTextColor={placeholderTextColor}
+              maxLength={150}
+            />
+          </View>
+
+          {/* Category Picker */}
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Category
+          </Text>
+          <View
+            style={[
+              styles.pickerContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <Picker
+              selectedValue={category}
+              onValueChange={(itemValue) => setCategory(itemValue || "")}
+              style={[styles.picker, { color: currentTheme.textPrimary }]}
+              dropdownIconColor={currentTheme.textPrimary} // Style dropdown icon color
+              prompt="Select a category" // Android only: Title for the picker dialog
+              // itemStyle={{ color: currentTheme.textPrimary }} // iOS only: style for picker items (use carefully)
+            >
+              <Picker.Item
+                label="-- Select a Category --"
+                value=""
+                style={{ color: placeholderTextColor }}
+              />
+              {INTEREST_OPTIONS.map((option) => (
+                <Picker.Item key={option} label={option} value={option} />
+              ))}
+            </Picker>
+          </View>
+
+          {/* Fee Input */}
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Fee ($)
+          </Text>
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <TextInput
+              placeholder="e.g., 10.50 (or leave blank for free)"
+              value={fee}
+              onChangeText={setFee}
+              keyboardType="decimal-pad" // Use decimal pad for currency
+              style={[
+                styles.input,
+                inputStyle(
+                  currentTheme,
+                  inputBackgroundColor,
+                  inputBorderColor
+                ),
+              ]}
+              placeholderTextColor={placeholderTextColor}
+            />
+          </View>
+
+          {/* Date & Time Picker Trigger */}
+          <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
+            Date & Time
+          </Text>
+          <View
+            style={[
+              styles.dateTriggerContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <TouchableOpacity
+              onPress={() => showDateTimePicker("date")} // Start with date picker
+              style={[
+                styles.input,
+                styles.dateTrigger,
+                inputStyle(
+                  currentTheme,
+                  inputBackgroundColor,
+                  inputBorderColor
+                ),
+              ]}
+            >
+              <Text
+                style={[
+                  styles.dateTriggerText,
+                  { color: currentTheme.textPrimary },
+                ]}
+              >
+                {date.toLocaleString([], {
+                  dateStyle: "medium",
+                  timeStyle: "short",
+                })}
+              </Text>
+              <Feather
+                name="calendar"
+                size={20}
+                color={currentTheme.textSecondary}
+              />
+            </TouchableOpacity>
+          </View>
+
+          {/* Submit Button */}
+          <TouchableOpacity
+            onPress={handlePost}
+            disabled={isLoading}
+            style={[
+              styles.submitButton,
+              {
+                backgroundColor: currentTheme.primary,
+                shadowColor: shadowColor,
+              },
+              isLoading && styles.submitButtonDisabled,
+            ]}
+          >
+            {isLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={currentTheme.buttonText || "#fff"}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.submitButtonText,
+                  { color: currentTheme.buttonText || "#fff" },
+                ]}
+              >
+                {editPost ? "Update Post" : "Create Post"}
+              </Text>
+            )}
+          </TouchableOpacity>
+
+          {/* Spacer at bottom */}
+          <View style={{ height: 50 }} />
+        </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }
 
 // Helper function for input styles to keep JSX cleaner
 const inputStyle = (theme: any, background: string, border: string) => ({
-    backgroundColor: background,
-    color: theme.textPrimary,
-    borderColor: border,
+  backgroundColor: background,
+  color: theme.textPrimary,
+  borderColor: border,
 });
 
 const styles = StyleSheet.create({
@@ -445,16 +636,16 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
     paddingBottom: 10,
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
-    borderBottomColor: 'transparent', // Use theme border
+    borderBottomColor: "transparent", // Use theme border
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.12,
         shadowRadius: 6,
@@ -476,7 +667,7 @@ const styles = StyleSheet.create({
     textAlign: "center",
     marginVertical: 15, // Add vertical margin for spacing
     paddingHorizontal: 20, // Ensure padding if text wraps
-    marginTop: '1.9%',
+    marginTop: "1.9%",
     marginBottom: 4,
   },
   card: {
@@ -497,8 +688,8 @@ const styles = StyleSheet.create({
     marginTop: 15, // Space above labels
   },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 0,
     borderRadius: 25, // Consistent radius
     paddingHorizontal: 12,
@@ -511,8 +702,8 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   textAreaContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 0,
     borderRadius: 25, // Consistent radius
     paddingHorizontal: 12,
@@ -537,14 +728,14 @@ const styles = StyleSheet.create({
   },
   textArea: {
     height: 90, // Slightly shorter default height
-    textAlignVertical: 'top',
+    textAlignVertical: "top",
   },
   pickerContainer: {
     borderWidth: 0,
     borderRadius: 25,
     marginBottom: 5,
-    overflow: 'hidden', // Ensure border radius clips the picker background on Android
-    justifyContent: 'center', // Center picker vertically for better alignment
+    overflow: "hidden", // Ensure border radius clips the picker background on Android
+    justifyContent: "center", // Center picker vertically for better alignment
     height: 55, // Set fixed height consistent with inputs
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
@@ -553,14 +744,14 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: "100%",
-    height: '100%', // Ensure picker fills container
+    height: "100%", // Ensure picker fills container
     // Minimal styling here, container handles appearance
-     backgroundColor: 'transparent', // Make picker background transparent
+    backgroundColor: "transparent", // Make picker background transparent
   },
   dateTriggerContainer: {
     flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 0,
     borderRadius: 25, // Consistent radius
     paddingHorizontal: 12,
@@ -574,9 +765,9 @@ const styles = StyleSheet.create({
   },
   dateTrigger: {
     // flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     // height: 55, // Match input height
     // textAlignVertical: 'top',
   },

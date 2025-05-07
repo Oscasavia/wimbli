@@ -32,9 +32,9 @@ import {
   getDoc,
   Timestamp, // Import Timestamp
   GeoPoint, // Import GeoPoint
-  orderBy,   // Import orderBy
-  startAt,   // Import startAt
-  endAt,     // Import endAt
+  orderBy, // Import orderBy
+  startAt, // Import startAt
+  endAt, // Import endAt
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
@@ -44,13 +44,13 @@ import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Feather } from "@expo/vector-icons"; // Use Feather exclusively
 import { SafeAreaView } from "react-native-safe-area-context";
-import * as Location from 'expo-location'; // Import expo-location
-import { geohashQueryBounds, distanceBetween } from 'geofire-common'; // Import geofire functions
+import * as Location from "expo-location"; // Import expo-location
+import { geohashQueryBounds, distanceBetween } from "geofire-common"; // Import geofire functions
 // Removed LinearGradient, FontAwesome, Animated, PanResponder
 
 // --- Define distance options in miles ---
 const DISTANCE_OPTIONS = {
-  "All": { label: "All Distances", value: "All" },
+  All: { label: "All Distances", value: "All" },
   "1mi": { label: "Within 1 mile", value: "1mi", miles: 1 },
   "5mi": { label: "Within 5 miles", value: "5mi", miles: 5 },
   "10mi": { label: "Within 10 miles", value: "10mi", miles: 10 },
@@ -71,18 +71,35 @@ type Post = {
   creatorUsername?: string; // Renamed for clarity, matches PostScreen
   creatorProfilePic?: string; // Renamed for clarity, matches PostScreen
   coordinates?: GeoPoint; // Added GeoPoint coordinates
-  geohash?: string;       // Added geohash
+  geohash?: string; // Added geohash
   // Add other fields if they exist
 };
 
 // Define INTEREST_OPTIONS if used in filters (assuming it's the same list)
 const INTEREST_OPTIONS = [
-    "Poetry", "Tennis", "Coding", "Volunteering", "Live Music", "Book Clubs",
-    "Photography", "Dancing", "Spirituality", "Outdoor Events", "Art", "Sports",
-    "Games", "Electronics", "Automotive", "Garden", "Academics", "Medical",
-    "Beauty", "Pet", "Food", "Clothes",
+  "Poetry",
+  "Tennis",
+  "Coding",
+  "Volunteering",
+  "Live Music",
+  "Book Clubs",
+  "Photography",
+  "Dancing",
+  "Spirituality",
+  "Outdoor Events",
+  "Art",
+  "Sports",
+  "Games",
+  "Electronics",
+  "Automotive",
+  "Garden",
+  "Academics",
+  "Medical",
+  "Beauty",
+  "Pet",
+  "Food",
+  "Clothes",
 ];
-
 
 export default function HomeScreen() {
   const navigation = useNavigation<any>();
@@ -96,10 +113,16 @@ export default function HomeScreen() {
   const [searchText, setSearchText] = useState("");
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<Post | null>(null);
-  const [distanceRadius, setDistanceRadius] = useState<keyof typeof DISTANCE_OPTIONS>("All"); // Filter state (logic not implemented)
-  const [selectedFee, setSelectedFee] = useState<"All" | "Free" | "Paid">("All"); // Filter state
+  const [distanceRadius, setDistanceRadius] =
+    useState<keyof typeof DISTANCE_OPTIONS>("All"); // Filter state (logic not implemented)
+  const [selectedFee, setSelectedFee] = useState<"All" | "Free" | "Paid">(
+    "All"
+  ); // Filter state
   const [isFilterDrawerVisible, setIsFilterDrawerVisible] = useState(false);
-  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [userLocation, setUserLocation] = useState<{
+    latitude: number;
+    longitude: number;
+  } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null); // For location errors
   const [isFetchingLocation, setIsFetchingLocation] = useState(false); // Location fetching state
 
@@ -108,13 +131,17 @@ export default function HomeScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
-  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
-  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
-  const cardBorderColor = currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
-  const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const inputBackgroundColor =
+    currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const cardBorderColor =
+    currentTheme.cardBorder || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const inputBorderColor =
+    currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
   const shadowColor = currentTheme.shadowColor || "#000";
-  const savedIconColor = currentTheme.primary || 'blue'; // Color for saved bookmark
+  const savedIconColor = currentTheme.primary || "blue"; // Color for saved bookmark
 
   // --- Function to get User Location ---
   const getUserLocation = useCallback(async () => {
@@ -123,9 +150,14 @@ export default function HomeScreen() {
     console.log("Attempting to get user location...");
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setLocationError('Permission to access location was denied. Please enable it in settings.');
-        Alert.alert('Location Permission Required', 'Please enable location services in your settings to filter by distance.');
+      if (status !== "granted") {
+        setLocationError(
+          "Permission to access location was denied. Please enable it in settings."
+        );
+        Alert.alert(
+          "Location Permission Required",
+          "Please enable location services in your settings to filter by distance."
+        );
         setIsFetchingLocation(false);
         setUserLocation(null); // Explicitly set to null on denial
         setDistanceRadius("All"); // Reset filter if permission denied
@@ -137,11 +169,18 @@ export default function HomeScreen() {
         accuracy: Location.Accuracy.Balanced, // Use Balanced for faster results, High if needed
       });
 
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Location request timed out')), 10000) // 10-second timeout
+      const timeoutPromise = new Promise(
+        (_, reject) =>
+          setTimeout(
+            () => reject(new Error("Location request timed out")),
+            10000
+          ) // 10-second timeout
       );
 
-      const locationResult = await Promise.race([locationPromise, timeoutPromise]) as Location.LocationObject;
+      const locationResult = (await Promise.race([
+        locationPromise,
+        timeoutPromise,
+      ])) as Location.LocationObject;
 
       const coords = {
         latitude: locationResult.coords.latitude,
@@ -154,7 +193,10 @@ export default function HomeScreen() {
     } catch (error: any) {
       console.error("Error getting location:", error);
       setLocationError(`Could not retrieve location: ${error.message}`);
-      Alert.alert("Location Error", `Could not retrieve your location: ${error.message}`);
+      Alert.alert(
+        "Location Error",
+        `Could not retrieve your location: ${error.message}`
+      );
       setUserLocation(null); // Explicitly set to null on error
       setIsFetchingLocation(false);
       setDistanceRadius("All"); // Reset filter on error
@@ -168,7 +210,7 @@ export default function HomeScreen() {
       let isMounted = true;
       let unsubscribeUser: (() => void) | null = null;
       let unsubscribePosts: (() => void) | null = null;
-  
+
       const currentFilters = {
         distanceRadius,
         selectedCategory,
@@ -176,31 +218,39 @@ export default function HomeScreen() {
         searchText,
         selectedFee,
       };
-  
+
       const setupListenersAndFetch = async (userId: string) => {
         setLoading(true);
-  
+
         if (unsubscribeUser) unsubscribeUser();
         if (unsubscribePosts) unsubscribePosts();
         unsubscribeUser = null;
         unsubscribePosts = null;
-  
+
         const userDocRef = doc(db, "users", userId);
         unsubscribeUser = onSnapshot(userDocRef, (userDoc) => {
           const interestsData = userDoc.data()?.interests || [];
           const savedPostsData = userDoc.data()?.savedPosts || [];
-          setUserInterests((prev) => !interestsAreEqual(prev, interestsData) ? interestsData : prev);
-          setSavedPosts((prev) => !savedPostsAreEqual(prev, savedPostsData) ? savedPostsData : prev);
+          setUserInterests((prev) =>
+            !interestsAreEqual(prev, interestsData) ? interestsData : prev
+          );
+          setSavedPosts((prev) =>
+            !savedPostsAreEqual(prev, savedPostsData) ? savedPostsData : prev
+          );
         });
-  
+
         try {
           let finalPosts: Post[] = [];
-  
+
           if (currentFilters.distanceRadius === "All") {
             const postsQuery = query(collection(db, "posts"));
             unsubscribePosts = onSnapshot(postsQuery, async (postsSnap) => {
               if (!isMounted) return;
-              const processed = await processPosts(postsSnap.docs, { ...currentFilters, userInterests }, null);
+              const processed = await processPosts(
+                postsSnap.docs,
+                { ...currentFilters, userInterests },
+                null
+              );
               if (isMounted) {
                 setPosts(processed);
                 setLoading(false);
@@ -212,7 +262,7 @@ export default function HomeScreen() {
             if (!centerCoords && !isFetchingLocation && !locationError) {
               centerCoords = await getUserLocation();
             }
-  
+
             if (!centerCoords) {
               if (isMounted) {
                 setPosts([]);
@@ -221,19 +271,36 @@ export default function HomeScreen() {
               }
               return;
             }
-  
-            const radiusInMiles = DISTANCE_OPTIONS[currentFilters.distanceRadius].miles;
+
+            const radiusInMiles =
+              DISTANCE_OPTIONS[currentFilters.distanceRadius].miles;
             const radiusInKm = radiusInMiles * KM_PER_MILE;
-            const center: [number, number] = [centerCoords.latitude, centerCoords.longitude];
+            const center: [number, number] = [
+              centerCoords.latitude,
+              centerCoords.longitude,
+            ];
             const bounds = geohashQueryBounds(center, radiusInKm * 1000);
-  
+
             const snapshots = await Promise.all(
-              bounds.map((b) => getDocs(query(collection(db, "posts"), orderBy("geohash"), startAt(b[0]), endAt(b[1]))))
+              bounds.map((b) =>
+                getDocs(
+                  query(
+                    collection(db, "posts"),
+                    orderBy("geohash"),
+                    startAt(b[0]),
+                    endAt(b[1])
+                  )
+                )
+              )
             );
-  
-            const matchingDocs = snapshots.flatMap(snap => snap.docs);
-            finalPosts = await processPosts(matchingDocs, { ...currentFilters, userInterests }, center);
-  
+
+            const matchingDocs = snapshots.flatMap((snap) => snap.docs);
+            finalPosts = await processPosts(
+              matchingDocs,
+              { ...currentFilters, userInterests },
+              center
+            );
+
             if (isMounted) {
               setPosts(finalPosts);
               setLoading(false);
@@ -249,7 +316,7 @@ export default function HomeScreen() {
           }
         }
       };
-  
+
       const unsubscribeAuth = onAuthStateChanged(auth, (user) => {
         if (user && isMounted) {
           setupListenersAndFetch(user.uid);
@@ -265,14 +332,22 @@ export default function HomeScreen() {
           setRefreshing(false);
         }
       });
-  
+
       return () => {
         isMounted = false;
         unsubscribeAuth();
         if (unsubscribeUser) unsubscribeUser();
         if (unsubscribePosts) unsubscribePosts();
       };
-    }, [distanceRadius, selectedCategory, sortOrder, searchText, selectedFee, userLocation, getUserLocation])
+    }, [
+      distanceRadius,
+      selectedCategory,
+      sortOrder,
+      searchText,
+      selectedFee,
+      userLocation,
+      getUserLocation,
+    ])
   );
 
   const processPosts = async (
@@ -291,17 +366,21 @@ export default function HomeScreen() {
       id: doc.id,
       ...doc.data(),
     })) as Post[];
-  
+
     // Filter by category
     if (filters.selectedCategory !== "All") {
-      posts = posts.filter((post) => post.category === filters.selectedCategory);
+      posts = posts.filter(
+        (post) => post.category === filters.selectedCategory
+      );
     }
-  
+
     // Filter by interests (if not "All")
     if (filters.userInterests?.length > 0) {
-      posts = posts.filter((post) => filters.userInterests.includes(post.category));
+      posts = posts.filter((post) =>
+        filters.userInterests.includes(post.category)
+      );
     }
-  
+
     // Filter by search text
     if (filters.searchText.trim() !== "") {
       const search = filters.searchText.toLowerCase();
@@ -311,14 +390,14 @@ export default function HomeScreen() {
           post.description.toLowerCase().includes(search)
       );
     }
-  
+
     // Filter by fee
     if (filters.selectedFee === "Free") {
       posts = posts.filter((post) => post.fee === 0);
     } else if (filters.selectedFee === "Paid") {
       posts = posts.filter((post) => post.fee > 0);
     }
-  
+
     // Filter by distance if centerCoords is provided
     if (centerCoords) {
       posts = posts.filter((post) => {
@@ -327,20 +406,23 @@ export default function HomeScreen() {
           [post.coordinates.latitude, post.coordinates.longitude],
           centerCoords
         );
-        const maxDistance = DISTANCE_OPTIONS[filters.distanceRadius]?.miles || 1000;
+        const maxDistance =
+          DISTANCE_OPTIONS[filters.distanceRadius]?.miles || 1000;
         return dist <= maxDistance * 1.60934 * 1000; // convert miles to meters
       });
     }
-  
+
     // Sort by date
     posts.sort((a, b) => {
-      const dateA = a.date instanceof Timestamp ? a.date.toDate() : new Date(a.date);
-      const dateB = b.date instanceof Timestamp ? b.date.toDate() : new Date(b.date);
+      const dateA =
+        a.date instanceof Timestamp ? a.date.toDate() : new Date(a.date);
+      const dateB =
+        b.date instanceof Timestamp ? b.date.toDate() : new Date(b.date);
       return filters.sortOrder === "asc"
         ? dateA.getTime() - dateB.getTime()
         : dateB.getTime() - dateA.getTime();
     });
-  
+
     return posts;
   };
 
@@ -352,7 +434,7 @@ export default function HomeScreen() {
       }
     }, [isDark, cardBackgroundColor])
   );
-  
+
   // --- Actions ---
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -379,7 +461,10 @@ export default function HomeScreen() {
     setIsFilterDrawerVisible(false);
   };
 
-  const interestsAreEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
+  const interestsAreEqual = (
+    arr1: string[] | undefined,
+    arr2: string[] | undefined
+  ): boolean => {
     if (!arr1 || !arr2) return arr1 === arr2; // Handle null/undefined cases
     if (arr1.length !== arr2.length) return false;
     // Create sorted copies for comparison to handle order differences
@@ -408,22 +493,26 @@ export default function HomeScreen() {
 
     // --- Persist change to Firestore ---
     try {
-      console.log(`Updating Firestore savedPosts. Action: ${isCurrentlySaved ? 'Unsave' : 'Save'}, PostID: ${postId}`);
+      console.log(
+        `Updating Firestore savedPosts. Action: ${isCurrentlySaved ? "Unsave" : "Save"}, PostID: ${postId}`
+      );
       await updateDoc(userDocRef, {
         // *** CONFIRM 'savedPosts' is the correct field name in Firestore ***
         savedPosts: isCurrentlySaved
           ? arrayRemove(postId) // Use arrayRemove to unsave
-          : arrayUnion(postId)   // Use arrayUnion to save
+          : arrayUnion(postId), // Use arrayUnion to save
       });
       console.log("Firestore savedPosts updated successfully.");
     } catch (error) {
       console.error("Error updating saved posts in Firestore:", error);
-      Alert.alert("Error", `Could not ${isCurrentlySaved ? 'unsave' : 'save'} event. Please try again.`);
+      Alert.alert(
+        "Error",
+        `Could not ${isCurrentlySaved ? "unsave" : "save"} event. Please try again.`
+      );
       // Revert optimistic UI update on error
       setSavedPosts(savedPosts); // Revert to the original state before the optimistic update
     }
   };
-
 
   const handleJoinChat = async (post: Post | null) => {
     if (!post || !auth.currentUser) return;
@@ -438,52 +527,59 @@ export default function HomeScreen() {
 
     // Or query by title as before:
     const groupsRef = collection(db, "groups");
-    const q = query(groupsRef, where("title", "==", groupTitle), where("postId", "==", post.id)); // Query by title AND postId for uniqueness
+    const q = query(
+      groupsRef,
+      where("title", "==", groupTitle),
+      where("postId", "==", post.id)
+    ); // Query by title AND postId for uniqueness
 
     setIsDetailsModalVisible(false); // Close modal before navigating
 
     try {
-        const querySnapshot = await getDocs(q);
-        let groupId = "";
-        let groupDocRef;
+      const querySnapshot = await getDocs(q);
+      let groupId = "";
+      let groupDocRef;
 
-        if (querySnapshot.empty) {
-          // Create new group if it doesn't exist
-          console.log(`Creating new chat group for post: ${post.title}`);
-          const newGroupRef = await addDoc(groupsRef, {
-            postId: post.id, // Link group to the post
-            title: groupTitle,
-            createdAt: serverTimestamp(),
-            members: [userId], // Add current user as the first member
-            createdBy: post.createdBy, // Store post creator
-          });
-          groupId = newGroupRef.id;
-        } else {
-          // Group exists, join it by adding user to members array
-          const groupDoc = querySnapshot.docs[0];
-          groupId = groupDoc.id;
-          groupDocRef = doc(db, "groups", groupId);
-          console.log(`Joining existing chat group: ${groupId}`);
-          await updateDoc(groupDocRef, {
-            members: arrayUnion(userId), // Add user if not already present
-          });
-        }
-
-        // Navigate to the Chat screen
-        navigation.navigate("Chat", { // Ensure "Chat" is the correct route name
-          groupId,
-          groupName: post.title,
+      if (querySnapshot.empty) {
+        // Create new group if it doesn't exist
+        console.log(`Creating new chat group for post: ${post.title}`);
+        const newGroupRef = await addDoc(groupsRef, {
+          postId: post.id, // Link group to the post
+          title: groupTitle,
+          createdAt: serverTimestamp(),
+          members: [userId], // Add current user as the first member
+          createdBy: post.createdBy, // Store post creator
         });
+        groupId = newGroupRef.id;
+      } else {
+        // Group exists, join it by adding user to members array
+        const groupDoc = querySnapshot.docs[0];
+        groupId = groupDoc.id;
+        groupDocRef = doc(db, "groups", groupId);
+        console.log(`Joining existing chat group: ${groupId}`);
+        await updateDoc(groupDocRef, {
+          members: arrayUnion(userId), // Add user if not already present
+        });
+      }
 
+      // Navigate to the Chat screen
+      navigation.navigate("Chat", {
+        // Ensure "Chat" is the correct route name
+        groupId,
+        groupName: post.title,
+      });
     } catch (error) {
-         console.error("Error joining or creating chat:", error);
-         Alert.alert("Error", "Could not join the chat for this event.");
-         setIsDetailsModalVisible(true); // Re-open modal on error if desired
+      console.error("Error joining or creating chat:", error);
+      Alert.alert("Error", "Could not join the chat for this event.");
+      setIsDetailsModalVisible(true); // Re-open modal on error if desired
     }
   };
 
   // Add helper function if needed
-  const savedPostsAreEqual = (arr1: string[] | undefined, arr2: string[] | undefined): boolean => {
+  const savedPostsAreEqual = (
+    arr1: string[] | undefined,
+    arr2: string[] | undefined
+  ): boolean => {
     if (!arr1 || !arr2) return arr1 === arr2;
     if (arr1.length !== arr2.length) return false;
     const sorted1 = [...arr1].sort();
@@ -497,101 +593,199 @@ export default function HomeScreen() {
     // Safely parse date for display within the card
     let displayDate = "Date unavailable";
     try {
-        const dateObj = item.date instanceof Timestamp ? item.date.toDate() : new Date(item.date);
-        if (!isNaN(dateObj.getTime())) {
-           displayDate = dateObj.toLocaleDateString([], { month: 'short', day: 'numeric' }); // Shorter date format for card
-        }
-    } catch (e) { console.error("Date parsing error in renderPostCard:", e); }
+      const dateObj =
+        item.date instanceof Timestamp
+          ? item.date.toDate()
+          : new Date(item.date);
+      if (!isNaN(dateObj.getTime())) {
+        displayDate = dateObj.toLocaleDateString([], {
+          month: "short",
+          day: "numeric",
+        }); // Shorter date format for card
+      }
+    } catch (e) {
+      console.error("Date parsing error in renderPostCard:", e);
+    }
 
     const isSaved = savedPosts.includes(item.id);
 
     return (
       // <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-      <TouchableOpacity activeOpacity={0.8} onPress={() => openDetailsModal(item)}>
+      <TouchableOpacity
+        activeOpacity={0.8}
+        onPress={() => openDetailsModal(item)}
+      >
         <StatusBar
           translucent={false}
           backgroundColor={cardBackgroundColor}
           barStyle={isDark ? "light-content" : "dark-content"}
         />
-        <View style={[styles.card, { backgroundColor: cardBackgroundColor, borderColor: cardBorderColor, shadowColor: shadowColor }]}>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: cardBackgroundColor,
+              borderColor: cardBorderColor,
+              shadowColor: shadowColor,
+            },
+          ]}
+        >
           {/* Top Row: Creator Info + Bookmark */}
           <View style={styles.cardTopRow}>
-              <TouchableOpacity
-                  style={styles.creatorInfoSmall}
-                  onPress={(e) => {
-                      e.stopPropagation(); // Prevent card press when tapping creator
-                      navigation.navigate("Profile", { userId: item.createdBy });
-                  }}
+            <TouchableOpacity
+              style={styles.creatorInfoSmall}
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent card press when tapping creator
+                navigation.navigate("Profile", { userId: item.createdBy });
+              }}
+            >
+              <Image
+                source={
+                  item.creatorProfilePic
+                    ? { uri: item.creatorProfilePic }
+                    : require("../assets/default-profile.png")
+                }
+                style={styles.creatorAvatarSmall}
+              />
+              <Text
+                style={[
+                  styles.creatorNameSmall,
+                  { color: currentTheme.textSecondary },
+                ]}
+                numberOfLines={1}
               >
-                  <Image
-                      source={item.creatorProfilePic ? { uri: item.creatorProfilePic } : require("../assets/default-profile.png")}
-                      style={styles.creatorAvatarSmall}
-                  />
-                  <Text style={[styles.creatorNameSmall, { color: currentTheme.textSecondary }]} numberOfLines={1}>
-                      {item.creatorUsername || 'Unknown'}
-                  </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                  onPress={(e) => {
-                      e.stopPropagation(); // Prevent card press when tapping bookmark
-                      handleToggleSave(item.id);
-                  }}
-                  style={styles.saveIconButton}
-              >
-                  <Feather
-                      name="bookmark"
-                      size={22}
-                      color={isSaved ? savedIconColor : currentTheme.textSecondary}
-                      fill={isSaved ? savedIconColor : 'none'} // Fill icon when saved
-                  />
-              </TouchableOpacity>
+                {item.creatorUsername || "Unknown"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              onPress={(e) => {
+                e.stopPropagation(); // Prevent card press when tapping bookmark
+                handleToggleSave(item.id);
+              }}
+              style={styles.saveIconButton}
+            >
+              <Feather
+                name="bookmark"
+                size={22}
+                color={isSaved ? savedIconColor : currentTheme.textSecondary}
+                fill={isSaved ? savedIconColor : "none"} // Fill icon when saved
+              />
+            </TouchableOpacity>
           </View>
 
           {/* Main Content */}
-          <Text style={[styles.cardTitle, { color: currentTheme.textPrimary }]} numberOfLines={2}>
+          <Text
+            style={[styles.cardTitle, { color: currentTheme.textPrimary }]}
+            numberOfLines={2}
+          >
             {item.title}
           </Text>
-          <Text style={[styles.cardDescShort, { color: currentTheme.textSecondary }]} numberOfLines={3}>
+          <Text
+            style={[
+              styles.cardDescShort,
+              { color: currentTheme.textSecondary },
+            ]}
+            numberOfLines={3}
+          >
             {item.description}
           </Text>
 
           {/* Bottom Row: Date, Category, Fee */}
-           <View style={[styles.cardBottomRow, { borderTopColor: cardBorderColor }]}>
-              <View style={styles.cardInfoItem}>
-                 <Feather name="calendar" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
-                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]}>{displayDate}</Text>
-              </View>
-              <View style={styles.cardInfoItem}>
-                 <Feather name="tag" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
-                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary }]} numberOfLines={1}>{item.category}</Text>
-              </View>
-              <View style={styles.cardInfoItem}>
-                 <Feather name="dollar-sign" size={14} color={currentTheme.textSecondary} style={styles.iconStyle} />
-                 <Text style={[styles.cardInfoText, { color: currentTheme.textSecondary, fontWeight: '600' }]}>
-                    {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
-                 </Text>
-              </View>
-           </View>
+          <View
+            style={[styles.cardBottomRow, { borderTopColor: cardBorderColor }]}
+          >
+            <View style={styles.cardInfoItem}>
+              <Feather
+                name="calendar"
+                size={14}
+                color={currentTheme.textSecondary}
+                style={styles.iconStyle}
+              />
+              <Text
+                style={[
+                  styles.cardInfoText,
+                  { color: currentTheme.textSecondary },
+                ]}
+              >
+                {displayDate}
+              </Text>
+            </View>
+            <View style={styles.cardInfoItem}>
+              <Feather
+                name="tag"
+                size={14}
+                color={currentTheme.textSecondary}
+                style={styles.iconStyle}
+              />
+              <Text
+                style={[
+                  styles.cardInfoText,
+                  { color: currentTheme.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {item.category}
+              </Text>
+            </View>
+            <View style={styles.cardInfoItem}>
+              <Feather
+                name="dollar-sign"
+                size={14}
+                color={currentTheme.textSecondary}
+                style={styles.iconStyle}
+              />
+              <Text
+                style={[
+                  styles.cardInfoText,
+                  { color: currentTheme.textSecondary, fontWeight: "600" },
+                ]}
+              >
+                {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+              </Text>
+            </View>
+          </View>
         </View>
       </TouchableOpacity>
     );
   };
-
 
   // --- Initial Loading / Auth Check ---
   // Moved auth check logic inside useEffect, handle loading state directly
   // This prevents rendering the main UI before auth state is known.
 
   return (
-    <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
+    <SafeAreaView
+      style={[
+        styles.screenContainer,
+        { backgroundColor: currentTheme.background },
+      ]}
+    >
       <StatusBar
-            backgroundColor={cardBackgroundColor}
-            barStyle={isDark ? "light-content" : "dark-content"}
-          />
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
       {/* Header: Search + Filter Button */}
-      <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
-        <View style={[styles.searchContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-          <Feather name="search" size={20} color={placeholderTextColor} style={styles.searchIcon} />
+      <View
+        style={[
+          styles.headerContainer,
+          { backgroundColor: cardBackgroundColor },
+        ]}
+      >
+        <View
+          style={[
+            styles.searchContainer,
+            {
+              backgroundColor: inputBackgroundColor,
+              borderColor: inputBorderColor,
+            },
+          ]}
+        >
+          <Feather
+            name="search"
+            size={20}
+            color={placeholderTextColor}
+            style={styles.searchIcon}
+          />
           <TextInput
             style={[styles.searchInput, { color: currentTheme.textPrimary }]}
             placeholder="Search events..."
@@ -600,13 +794,19 @@ export default function HomeScreen() {
             onChangeText={setSearchText}
             returnKeyType="search"
           />
-           {searchText.length > 0 && ( // Show clear button only when there is text
-                <TouchableOpacity onPress={() => setSearchText('')} style={styles.clearSearchButton}>
-                    <Feather name="x-circle" size={18} color={placeholderTextColor} />
-                </TouchableOpacity>
-            )}
+          {searchText.length > 0 && ( // Show clear button only when there is text
+            <TouchableOpacity
+              onPress={() => setSearchText("")}
+              style={styles.clearSearchButton}
+            >
+              <Feather name="x-circle" size={18} color={placeholderTextColor} />
+            </TouchableOpacity>
+          )}
         </View>
-        <TouchableOpacity style={styles.filterTriggerButton} onPress={openFilterDrawer}>
+        <TouchableOpacity
+          style={styles.filterTriggerButton}
+          onPress={openFilterDrawer}
+        >
           <Feather name="sliders" size={24} color={currentTheme.primary} />
         </TouchableOpacity>
       </View>
@@ -615,27 +815,47 @@ export default function HomeScreen() {
       {loading || isFetchingLocation ? (
         <View style={styles.centerStatusContainer}>
           <ActivityIndicator size="large" color={currentTheme.primary} />
-          <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
-            {isFetchingLocation ? 'Getting your location...' : 'Loading events...'}
+          <Text
+            style={[styles.statusText, { color: currentTheme.textSecondary }]}
+          >
+            {isFetchingLocation
+              ? "Getting your location..."
+              : "Loading events..."}
           </Text>
           {locationError && ( // Show location error if any
-              <Text style={[styles.statusText, { color: 'red', marginTop: 10 }]}>{locationError}</Text>
-           )}
+            <Text style={[styles.statusText, { color: "red", marginTop: 10 }]}>
+              {locationError}
+            </Text>
+          )}
         </View>
       ) : posts.length === 0 ? (
         <ScrollView
-            contentContainerStyle={styles.centerStatusContainer}
-            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[currentTheme.primary]} tintColor={currentTheme.primary}/>}
+          contentContainerStyle={styles.centerStatusContainer}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[currentTheme.primary]}
+              tintColor={currentTheme.primary}
+            />
+          }
         >
-          <Feather name="calendar" size={50} color={currentTheme.textSecondary} />
-          <Text style={[styles.statusTitle, { color: currentTheme.textPrimary }]}>
+          <Feather
+            name="calendar"
+            size={50}
+            color={currentTheme.textSecondary}
+          />
+          <Text
+            style={[styles.statusTitle, { color: currentTheme.textPrimary }]}
+          >
             {locationError ? "Location Error" : "No Events Found"}
           </Text>
-          <Text style={[styles.statusText, { color: currentTheme.textSecondary }]}>
+          <Text
+            style={[styles.statusText, { color: currentTheme.textSecondary }]}
+          >
             {locationError
-                    ? locationError // Display the specific error
-                    : "No events match your current filters. Try adjusting them or granting location permission!"
-                }
+              ? locationError // Display the specific error
+              : "No events match your current filters. Try adjusting them or granting location permission!"}
           </Text>
         </ScrollView>
       ) : (
@@ -647,10 +867,10 @@ export default function HomeScreen() {
           showsVerticalScrollIndicator={false}
           refreshControl={
             <RefreshControl
-                refreshing={refreshing}
-                onRefresh={onRefresh}
-                colors={[currentTheme.primary]} // Android primary color
-                tintColor={currentTheme.primary} // iOS primary color
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              colors={[currentTheme.primary]} // Android primary color
+              tintColor={currentTheme.primary} // iOS primary color
             />
           }
         />
@@ -665,107 +885,239 @@ export default function HomeScreen() {
         visible={isDetailsModalVisible}
         onRequestClose={closeDetailsModal}
       >
-        <Pressable style={styles.detailsModalOverlay} onPress={closeDetailsModal}>
-           {/* Use Pressable for content to stop overlay press propagation */}
-          <Pressable style={[styles.detailsModalContent, { backgroundColor: currentTheme.cardBackground }]}>
+        <Pressable
+          style={styles.detailsModalOverlay}
+          onPress={closeDetailsModal}
+        >
+          {/* Use Pressable for content to stop overlay press propagation */}
+          <Pressable
+            style={[
+              styles.detailsModalContent,
+              { backgroundColor: currentTheme.cardBackground },
+            ]}
+          >
             {selectedPost && (
               <>
                 <ScrollView
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.detailsScrollContainer}
+                  showsVerticalScrollIndicator={false}
+                  contentContainerStyle={styles.detailsScrollContainer}
                 >
-                    {/* Creator Info Header */}
-                    <TouchableOpacity
-                        style={styles.creatorInfoContainer}
-                        onPress={() => {
-                            closeDetailsModal();
-                            if (selectedPost?.createdBy) {
-                                navigation.navigate("Profile", { userId: selectedPost.createdBy });
-                            }
-                        }}
+                  {/* Creator Info Header */}
+                  <TouchableOpacity
+                    style={styles.creatorInfoContainer}
+                    onPress={() => {
+                      closeDetailsModal();
+                      if (selectedPost?.createdBy) {
+                        navigation.navigate("Profile", {
+                          userId: selectedPost.createdBy,
+                        });
+                      }
+                    }}
+                  >
+                    <Image
+                      source={
+                        selectedPost.creatorProfilePic
+                          ? { uri: selectedPost.creatorProfilePic }
+                          : require("../assets/default-profile.png")
+                      }
+                      style={[
+                        styles.creatorAvatar,
+                        { borderColor: currentTheme.background },
+                      ]}
+                    />
+                    <Text
+                      style={[
+                        styles.creatorNameText,
+                        { color: currentTheme.textPrimary },
+                      ]}
+                      numberOfLines={1}
                     >
-                        <Image
-                            source={selectedPost.creatorProfilePic ? { uri: selectedPost.creatorProfilePic } : require("../assets/default-profile.png")}
-                            style={[styles.creatorAvatar, {borderColor: currentTheme.background}]}
-                        />
-                        <Text style={[styles.creatorNameText, { color: currentTheme.textPrimary }]} numberOfLines={1}>
-                            {selectedPost.creatorUsername || "Unknown User"}
-                        </Text>
-                    </TouchableOpacity>
-
-                    {/* Post Title */}
-                    <Text style={[styles.detailsModalTitle, { color: currentTheme.textPrimary }]}>
-                        {selectedPost.title}
+                      {selectedPost.creatorUsername || "Unknown User"}
                     </Text>
+                  </TouchableOpacity>
 
-                    {/* Details Section (Date, Location, Category, Fee) */}
-                    <View style={styles.detailsSection}>
-                        <View style={styles.detailRow}>
-                            <Feather name="calendar" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
-                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
-                                {selectedPost.date instanceof Timestamp
-                                 ? selectedPost.date.toDate().toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })
-                                 : new Date(selectedPost.date).toLocaleString([], { dateStyle: 'full', timeStyle: 'short' })
-                                }
-                            </Text>
-                        </View>
-                         <View style={styles.detailRow}>
-                            <Feather name="map-pin" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
-                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
-                                {selectedPost.location}
-                            </Text>
-                        </View>
-                         <View style={styles.detailRow}>
-                            <Feather name="tag" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
-                            <Text style={[styles.detailText, { color: currentTheme.textSecondary }]}>
-                                {selectedPost.category}
-                            </Text>
-                        </View>
-                         <View style={styles.detailRow}>
-                            <Feather name="dollar-sign" size={18} color={currentTheme.textSecondary} style={styles.detailIcon} />
-                            <Text style={[styles.detailText, styles.detailFee, { color: selectedPost.fee === 0 ? currentTheme.primary : currentTheme.textPrimary }]}>
-                                {selectedPost.fee === 0 ? "Free Event" : `$${selectedPost.fee.toFixed(2)}`}
-                            </Text>
-                        </View>
+                  {/* Post Title */}
+                  <Text
+                    style={[
+                      styles.detailsModalTitle,
+                      { color: currentTheme.textPrimary },
+                    ]}
+                  >
+                    {selectedPost.title}
+                  </Text>
+
+                  {/* Details Section (Date, Location, Category, Fee) */}
+                  <View style={styles.detailsSection}>
+                    <View style={styles.detailRow}>
+                      <Feather
+                        name="calendar"
+                        size={18}
+                        color={currentTheme.textSecondary}
+                        style={styles.detailIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: currentTheme.textSecondary },
+                        ]}
+                      >
+                        {selectedPost.date instanceof Timestamp
+                          ? selectedPost.date
+                              .toDate()
+                              .toLocaleString([], {
+                                dateStyle: "full",
+                                timeStyle: "short",
+                              })
+                          : new Date(selectedPost.date).toLocaleString([], {
+                              dateStyle: "full",
+                              timeStyle: "short",
+                            })}
+                      </Text>
                     </View>
+                    <View style={styles.detailRow}>
+                      <Feather
+                        name="map-pin"
+                        size={18}
+                        color={currentTheme.textSecondary}
+                        style={styles.detailIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: currentTheme.textSecondary },
+                        ]}
+                      >
+                        {selectedPost.location}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather
+                        name="tag"
+                        size={18}
+                        color={currentTheme.textSecondary}
+                        style={styles.detailIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          { color: currentTheme.textSecondary },
+                        ]}
+                      >
+                        {selectedPost.category}
+                      </Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Feather
+                        name="dollar-sign"
+                        size={18}
+                        color={currentTheme.textSecondary}
+                        style={styles.detailIcon}
+                      />
+                      <Text
+                        style={[
+                          styles.detailText,
+                          styles.detailFee,
+                          {
+                            color:
+                              selectedPost.fee === 0
+                                ? currentTheme.primary
+                                : currentTheme.textPrimary,
+                          },
+                        ]}
+                      >
+                        {selectedPost.fee === 0
+                          ? "Free Event"
+                          : `$${selectedPost.fee.toFixed(2)}`}
+                      </Text>
+                    </View>
+                  </View>
 
-                    {/* Separator */}
-                    <View style={[styles.detailsSeparator, { borderBottomColor: inputBorderColor }]} />
+                  {/* Separator */}
+                  <View
+                    style={[
+                      styles.detailsSeparator,
+                      { borderBottomColor: inputBorderColor },
+                    ]}
+                  />
 
-                    {/* Description Section */}
-                    <Text style={[styles.descriptionTitle, { color: currentTheme.textPrimary }]}>
-                        About this event
-                    </Text>
-                    <Text style={[styles.detailsModalDesc, { color: currentTheme.textPrimary }]}>
-                        {selectedPost.description}
-                    </Text>
+                  {/* Description Section */}
+                  <Text
+                    style={[
+                      styles.descriptionTitle,
+                      { color: currentTheme.textPrimary },
+                    ]}
+                  >
+                    About this event
+                  </Text>
+                  <Text
+                    style={[
+                      styles.detailsModalDesc,
+                      { color: currentTheme.textPrimary },
+                    ]}
+                  >
+                    {selectedPost.description}
+                  </Text>
                 </ScrollView>
 
-                 {/* Action Buttons Footer */}
-                <View style={[styles.buttonContainer, { borderTopColor: inputBorderColor }]}>
-                    <TouchableOpacity
-                        style={[styles.actionButton, styles.joinButton, {backgroundColor: currentTheme.primary}]} // Use theme primary for join
-                        onPress={() => handleJoinChat(selectedPost)}
+                {/* Action Buttons Footer */}
+                <View
+                  style={[
+                    styles.buttonContainer,
+                    { borderTopColor: inputBorderColor },
+                  ]}
+                >
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.joinButton,
+                      { backgroundColor: currentTheme.primary },
+                    ]} // Use theme primary for join
+                    onPress={() => handleJoinChat(selectedPost)}
+                  >
+                    <Feather
+                      name="message-circle"
+                      size={18}
+                      color={currentTheme.buttonText || "#fff"}
+                      style={styles.buttonIcon}
+                    />
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        { color: currentTheme.buttonText || "#fff" },
+                      ]}
                     >
-                        <Feather name="message-circle" size={18} color={currentTheme.buttonText || '#fff'} style={styles.buttonIcon} />
-                        <Text style={[styles.actionButtonText, { color: currentTheme.buttonText || '#fff' }]}>
-                            Join Chat
-                        </Text>
-                    </TouchableOpacity>
-                     <TouchableOpacity
-                        style={[styles.actionButton, styles.closeButtonAlt, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}
-                        onPress={closeDetailsModal}
+                      Join Chat
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.actionButton,
+                      styles.closeButtonAlt,
+                      {
+                        backgroundColor: inputBackgroundColor,
+                        borderColor: inputBorderColor,
+                      },
+                    ]}
+                    onPress={closeDetailsModal}
+                  >
+                    <Text
+                      style={[
+                        styles.actionButtonText,
+                        { color: currentTheme.textSecondary },
+                      ]}
                     >
-                        <Text style={[styles.actionButtonText, { color: currentTheme.textSecondary }]}>
-                            Close
-                        </Text>
-                    </TouchableOpacity>
+                      Close
+                    </Text>
+                  </TouchableOpacity>
                 </View>
               </>
             )}
             {/* Optional Explicit Close Icon */}
-            <TouchableOpacity style={styles.modalCloseIcon} onPress={closeDetailsModal}>
-                <Feather name="x" size={28} color={currentTheme.textSecondary} />
+            <TouchableOpacity
+              style={styles.modalCloseIcon}
+              onPress={closeDetailsModal}
+            >
+              <Feather name="x" size={28} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -780,113 +1132,246 @@ export default function HomeScreen() {
       >
         <Pressable style={styles.drawerOverlay} onPress={closeFilterDrawer}>
           {/* Use Pressable for content to stop overlay press propagation */}
-          <Pressable style={[styles.drawerContainer, { backgroundColor: currentTheme.background }]}>
+          <Pressable
+            style={[
+              styles.drawerContainer,
+              { backgroundColor: currentTheme.background },
+            ]}
+          >
             <ScrollView showsVerticalScrollIndicator={false}>
-              <Text style={[styles.drawerTitle, { color: currentTheme.textPrimary }]}>
+              <Text
+                style={[
+                  styles.drawerTitle,
+                  { color: currentTheme.textPrimary },
+                ]}
+              >
                 Filters & Sort
               </Text>
 
               {/* Category Filter */}
               <View style={styles.drawerSection}>
-                <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Category</Text>
-                <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
+                <Text
+                  style={[
+                    styles.drawerLabel,
+                    { color: currentTheme.textSecondary },
+                  ]}
+                >
+                  Category
+                </Text>
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    {
+                      borderColor: inputBorderColor,
+                      backgroundColor: inputBackgroundColor,
+                    },
+                  ]}
+                >
                   <Picker
                     selectedValue={selectedCategory}
-                    onValueChange={(itemValue) => setSelectedCategory(itemValue || "All")}
+                    onValueChange={(itemValue) =>
+                      setSelectedCategory(itemValue || "All")
+                    }
                     style={[styles.picker, { color: currentTheme.textPrimary }]}
-                    itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}} // iOS itemStyle
+                    itemStyle={
+                      Platform.OS === "ios"
+                        ? {
+                            color: currentTheme.textPrimary,
+                            backgroundColor: currentTheme.background,
+                          }
+                        : {}
+                    } // iOS itemStyle
                     dropdownIconColor={currentTheme.textPrimary}
                     prompt="Select Category"
                   >
                     <Picker.Item label="All Categories" value="All" />
                     {/* Use INTEREST_OPTIONS defined globally or fetched */}
                     {INTEREST_OPTIONS.map((interest) => (
-                      <Picker.Item key={interest} label={interest} value={interest} />
+                      <Picker.Item
+                        key={interest}
+                        label={interest}
+                        value={interest}
+                      />
                     ))}
                   </Picker>
                 </View>
               </View>
 
               {/* Sort Order */}
-               <View style={styles.drawerSection}>
-                 <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Sort By Date</Text>
-                 <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
-                   <Picker
-                     selectedValue={sortOrder}
-                     onValueChange={(itemValue) => setSortOrder(itemValue as "desc" | "asc")}
-                     style={[styles.picker, { color: currentTheme.textPrimary }]}
+              <View style={styles.drawerSection}>
+                <Text
+                  style={[
+                    styles.drawerLabel,
+                    { color: currentTheme.textSecondary },
+                  ]}
+                >
+                  Sort By Date
+                </Text>
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    {
+                      borderColor: inputBorderColor,
+                      backgroundColor: inputBackgroundColor,
+                    },
+                  ]}
+                >
+                  <Picker
+                    selectedValue={sortOrder}
+                    onValueChange={(itemValue) =>
+                      setSortOrder(itemValue as "desc" | "asc")
+                    }
+                    style={[styles.picker, { color: currentTheme.textPrimary }]}
                     //  itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
-                     dropdownIconColor={currentTheme.textPrimary}
-                     prompt="Sort Order"
-                   >
-                     <Picker.Item label="Newest First" value="desc" />
-                     <Picker.Item label="Oldest First" value="asc" />
-                   </Picker>
-                 </View>
-               </View>
-
-               {/* Distance Filter (UI only) */}
-                <View style={styles.drawerSection}>
-                  <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Distance</Text>
-                  <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
-                    <Picker
-                      selectedValue={distanceRadius}
-                      onValueChange={(itemValue) => {
-                        const newRadius = itemValue as keyof typeof DISTANCE_OPTIONS;
-                              // If user selects a distance, ensure we have location or try to get it
-                              if (newRadius !== "All" && !userLocation) {
-                                  getUserLocation(); // Attempt to get location when filter is selected
-                              }
-                              setDistanceRadius(newRadius);
-                      }}
-                      style={[styles.picker, { color: currentTheme.textPrimary }]}
-                      itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
-                      dropdownIconColor={currentTheme.textPrimary}
-                      prompt="Select Distance"
-                      // enabled={false} // Disable until implemented
-                    >
-                      {Object.entries(DISTANCE_OPTIONS).map(([key, option]) => (
-                             <Picker.Item key={key} label={option.label} value={option.value} />
-                          ))}
-                    </Picker>
-                  </View>
-                    {isFetchingLocation && distanceRadius !== "All" && <Text style={[styles.statusText, {fontSize: 12, marginTop: 5}]}>Fetching location...</Text>}
-                    {locationError && distanceRadius !== "All" && <Text style={[styles.statusText, {fontSize: 12, marginTop: 5, color: 'red'}]}>{locationError}</Text>}
+                    dropdownIconColor={currentTheme.textPrimary}
+                    prompt="Sort Order"
+                  >
+                    <Picker.Item label="Newest First" value="desc" />
+                    <Picker.Item label="Oldest First" value="asc" />
+                  </Picker>
                 </View>
+              </View>
 
-               {/* Fee Filter */}
-                <View style={styles.drawerSection}>
-                  <Text style={[styles.drawerLabel, { color: currentTheme.textSecondary }]}>Fee</Text>
-                  <View style={[styles.pickerWrapper, { borderColor: inputBorderColor, backgroundColor: inputBackgroundColor }]}>
-                    <Picker
-                      selectedValue={selectedFee}
-                      onValueChange={(itemValue) => setSelectedFee(itemValue as "All" | "Free" | "Paid")}
-                      style={[styles.picker, { color: currentTheme.textPrimary }]}
-                      itemStyle={Platform.OS === 'ios' ? { color: currentTheme.textPrimary, backgroundColor: currentTheme.background } : {}}
-                      dropdownIconColor={currentTheme.textPrimary}
-                      prompt="Select Fee Type"
-                    >
-                      <Picker.Item label="All Fees" value="All" />
-                      <Picker.Item label="Free Only" value="Free" />
-                      <Picker.Item label="Paid Only" value="Paid" />
-                    </Picker>
-                  </View>
+              {/* Distance Filter (UI only) */}
+              <View style={styles.drawerSection}>
+                <Text
+                  style={[
+                    styles.drawerLabel,
+                    { color: currentTheme.textSecondary },
+                  ]}
+                >
+                  Distance
+                </Text>
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    {
+                      borderColor: inputBorderColor,
+                      backgroundColor: inputBackgroundColor,
+                    },
+                  ]}
+                >
+                  <Picker
+                    selectedValue={distanceRadius}
+                    onValueChange={(itemValue) => {
+                      const newRadius =
+                        itemValue as keyof typeof DISTANCE_OPTIONS;
+                      // If user selects a distance, ensure we have location or try to get it
+                      if (newRadius !== "All" && !userLocation) {
+                        getUserLocation(); // Attempt to get location when filter is selected
+                      }
+                      setDistanceRadius(newRadius);
+                    }}
+                    style={[styles.picker, { color: currentTheme.textPrimary }]}
+                    itemStyle={
+                      Platform.OS === "ios"
+                        ? {
+                            color: currentTheme.textPrimary,
+                            backgroundColor: currentTheme.background,
+                          }
+                        : {}
+                    }
+                    dropdownIconColor={currentTheme.textPrimary}
+                    prompt="Select Distance"
+                    // enabled={false} // Disable until implemented
+                  >
+                    {Object.entries(DISTANCE_OPTIONS).map(([key, option]) => (
+                      <Picker.Item
+                        key={key}
+                        label={option.label}
+                        value={option.value}
+                      />
+                    ))}
+                  </Picker>
                 </View>
+                {isFetchingLocation && distanceRadius !== "All" && (
+                  <Text
+                    style={[styles.statusText, { fontSize: 12, marginTop: 5 }]}
+                  >
+                    Fetching location...
+                  </Text>
+                )}
+                {locationError && distanceRadius !== "All" && (
+                  <Text
+                    style={[
+                      styles.statusText,
+                      { fontSize: 12, marginTop: 5, color: "red" },
+                    ]}
+                  >
+                    {locationError}
+                  </Text>
+                )}
+              </View>
+
+              {/* Fee Filter */}
+              <View style={styles.drawerSection}>
+                <Text
+                  style={[
+                    styles.drawerLabel,
+                    { color: currentTheme.textSecondary },
+                  ]}
+                >
+                  Fee
+                </Text>
+                <View
+                  style={[
+                    styles.pickerWrapper,
+                    {
+                      borderColor: inputBorderColor,
+                      backgroundColor: inputBackgroundColor,
+                    },
+                  ]}
+                >
+                  <Picker
+                    selectedValue={selectedFee}
+                    onValueChange={(itemValue) =>
+                      setSelectedFee(itemValue as "All" | "Free" | "Paid")
+                    }
+                    style={[styles.picker, { color: currentTheme.textPrimary }]}
+                    itemStyle={
+                      Platform.OS === "ios"
+                        ? {
+                            color: currentTheme.textPrimary,
+                            backgroundColor: currentTheme.background,
+                          }
+                        : {}
+                    }
+                    dropdownIconColor={currentTheme.textPrimary}
+                    prompt="Select Fee Type"
+                  >
+                    <Picker.Item label="All Fees" value="All" />
+                    <Picker.Item label="Free Only" value="Free" />
+                    <Picker.Item label="Paid Only" value="Paid" />
+                  </Picker>
+                </View>
+              </View>
 
               {/* Drawer Close Button */}
               <TouchableOpacity
-                style={[styles.drawerCloseButton, { backgroundColor: currentTheme.primary }]}
+                style={[
+                  styles.drawerCloseButton,
+                  { backgroundColor: currentTheme.primary },
+                ]}
                 onPress={closeFilterDrawer}
               >
-                <Text style={[styles.drawerCloseButtonText, { color: currentTheme.buttonText || '#fff' }]}>
+                <Text
+                  style={[
+                    styles.drawerCloseButtonText,
+                    { color: currentTheme.buttonText || "#fff" },
+                  ]}
+                >
                   Apply Filters
                 </Text>
               </TouchableOpacity>
-              <View style={{ height: 30 }} />{/* Bottom Spacer */}
+              <View style={{ height: 30 }} />
+              {/* Bottom Spacer */}
             </ScrollView>
-             {/* Optional Explicit Close Icon for Drawer */}
-             <TouchableOpacity style={styles.drawerCloseIcon} onPress={closeFilterDrawer}>
-                <Feather name="x" size={28} color={currentTheme.textSecondary} />
+            {/* Optional Explicit Close Icon for Drawer */}
+            <TouchableOpacity
+              style={styles.drawerCloseIcon}
+              onPress={closeFilterDrawer}
+            >
+              <Feather name="x" size={28} color={currentTheme.textSecondary} />
             </TouchableOpacity>
           </Pressable>
         </Pressable>
@@ -898,7 +1383,8 @@ export default function HomeScreen() {
 // --- Styles ---
 const screenWidth = Dimensions.get("window").width;
 const styles = StyleSheet.create({
-  screenContainer: { // Replaces container
+  screenContainer: {
+    // Replaces container
     flex: 1,
     // Background color set dynamically
   },
@@ -906,14 +1392,14 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
     paddingBottom: 10,
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
-    borderBottomColor: 'transparent', // Use theme border
+    borderBottomColor: "transparent", // Use theme border
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.12,
         shadowRadius: 6,
@@ -943,33 +1429,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     // Dynamic color
   },
-   clearSearchButton: {
-      padding: 4, // Make it easier to tap
-      marginLeft: 4,
-   },
+  clearSearchButton: {
+    padding: 4, // Make it easier to tap
+    marginLeft: 4,
+  },
   filterTriggerButton: {
     marginLeft: 10,
     padding: 8,
   },
-  centerStatusContainer: { // For Loading and Empty states
+  centerStatusContainer: {
+    // For Loading and Empty states
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
     padding: 20,
   },
   statusTitle: {
-     fontSize: 20,
-     fontWeight: 'bold',
-     marginTop: 15,
-     marginBottom: 8,
-     textAlign: 'center',
+    fontSize: 20,
+    fontWeight: "bold",
+    marginTop: 15,
+    marginBottom: 8,
+    textAlign: "center",
   },
   statusText: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     lineHeight: 22,
   },
-  listContainer: { // For FlatList
+  listContainer: {
+    // For FlatList
     paddingHorizontal: 5,
     paddingTop: 5,
     paddingBottom: 30,
@@ -987,35 +1475,35 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   cardTopRow: {
-     flexDirection: 'row',
-     justifyContent: 'space-between',
-     alignItems: 'center',
-     marginBottom: 10,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 10,
   },
   creatorInfoSmall: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     flex: 1, // Allow shrinking/growing
-     paddingRight: 10, // Prevent overlap with bookmark
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1, // Allow shrinking/growing
+    paddingRight: 10, // Prevent overlap with bookmark
   },
   creatorAvatarSmall: {
-     width: 28,
-     height: 28,
-     borderRadius: 14,
-     marginRight: 8,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    marginRight: 8,
   },
   creatorNameSmall: {
-     fontSize: 13,
-     fontWeight: '500',
-     flexShrink: 1, // Allow text to shrink if needed
+    fontSize: 13,
+    fontWeight: "500",
+    flexShrink: 1, // Allow text to shrink if needed
   },
   saveIconButton: {
-     paddingLeft: 10, // Increase tappable area
-     paddingVertical: 5,
+    paddingLeft: 10, // Increase tappable area
+    paddingVertical: 5,
   },
   cardTitle: {
     fontSize: 17,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 6,
     lineHeight: 24,
   },
@@ -1025,34 +1513,36 @@ const styles = StyleSheet.create({
     marginTop: 8,
     marginBottom: 12,
   },
-   cardBottomRow: {
-     flexDirection: 'row',
-     justifyContent: 'space-between',
-     alignItems: 'center',
-     borderTopWidth: StyleSheet.hairlineWidth,
-     marginTop: 10,
-     paddingTop: 10,
-     flexWrap: 'wrap', // Allow wrapping on small screens
-   },
-   cardInfoItem: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     marginRight: 12, // Space between items
-     marginBottom: 5, // Space if items wrap
-   },
-   cardInfoText: {
-     fontSize: 13,
-     marginLeft: 4,
-   },
-   iconStyle: {
-      // Shared style for small icons in card bottom/date rows
-   },
-   dateTimeRow: { // If needed for card internal layout
-    flexDirection: 'row',
-    alignItems: 'center',
+  cardBottomRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 10,
+    paddingTop: 10,
+    flexWrap: "wrap", // Allow wrapping on small screens
+  },
+  cardInfoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginRight: 12, // Space between items
+    marginBottom: 5, // Space if items wrap
+  },
+  cardInfoText: {
+    fontSize: 13,
+    marginLeft: 4,
+  },
+  iconStyle: {
+    // Shared style for small icons in card bottom/date rows
+  },
+  dateTimeRow: {
+    // If needed for card internal layout
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
-   cardDateTime: { // If needed for card internal layout
+  cardDateTime: {
+    // If needed for card internal layout
     fontSize: 13,
     marginLeft: 4,
   },
@@ -1068,7 +1558,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     right: 0,
     width: Math.min(screenWidth * 0.85, 350), // Limit width
-    paddingTop: Platform.OS === 'ios' ? 50 : 30, // Adjust top padding for status bar/notch
+    paddingTop: Platform.OS === "ios" ? 50 : 30, // Adjust top padding for status bar/notch
     paddingHorizontal: 20,
     paddingBottom: 30,
     shadowColor: "#000",
@@ -1078,13 +1568,13 @@ const styles = StyleSheet.create({
     elevation: 10,
     // Dynamic background color
   },
-   drawerCloseIcon: {
-     position: 'absolute',
-     top: Platform.OS === 'ios' ? 45 : 15,
-     right: 15,
-     padding: 10,
-     zIndex: 1, // Ensure it's tappable
-   },
+  drawerCloseIcon: {
+    position: "absolute",
+    top: Platform.OS === "ios" ? 45 : 15,
+    right: 15,
+    padding: 10,
+    zIndex: 1, // Ensure it's tappable
+  },
   drawerTitle: {
     fontSize: 22,
     fontWeight: "bold",
@@ -1103,7 +1593,7 @@ const styles = StyleSheet.create({
     borderRadius: 25,
     borderWidth: 0,
     overflow: "hidden", // Clip picker on Android
-    justifyContent: 'center', // Align picker text vertically
+    justifyContent: "center", // Align picker text vertically
     height: 55, // Consistent height
     // Dynamic background and border color
     shadowOffset: { width: 0, height: 1 },
@@ -1113,9 +1603,9 @@ const styles = StyleSheet.create({
   },
   picker: {
     width: "100%",
-    height: '100%',
+    height: "100%",
     // Dynamic color
-    backgroundColor: 'transparent',
+    backgroundColor: "transparent",
   },
   drawerCloseButton: {
     flexDirection: "row",
@@ -1222,7 +1712,7 @@ const styles = StyleSheet.create({
   },
   detailsSeparator: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#ccc', // Use theme color
+    backgroundColor: "#ccc", // Use theme color
     marginVertical: 20,
   },
   descriptionTitle: {
@@ -1252,7 +1742,7 @@ const styles = StyleSheet.create({
     flex: 1, // Equal width
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,

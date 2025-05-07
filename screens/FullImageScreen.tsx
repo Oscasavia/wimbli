@@ -28,8 +28,8 @@ export default function FullImageScreen() {
 
   // Define colors for clarity
   // Use a very dark color, often pure black or near-black works best for image viewers
-  const backgroundColor = isDark ? currentTheme.background : '#000000'; // Default to black for light theme
-  const iconColor = '#ffffff'; // Usually white icon on dark background
+  const backgroundColor = isDark ? currentTheme.background : "#000000"; // Default to black for light theme
+  const iconColor = "#ffffff"; // Usually white icon on dark background
 
   return (
     // SafeAreaView helps position close button correctly
@@ -38,10 +38,7 @@ export default function FullImageScreen() {
       <StatusBar barStyle="light-content" backgroundColor={backgroundColor} />
 
       {/* Pressable background to allow tap-to-dismiss */}
-      <Pressable
-        style={styles.container}
-        onPress={() => navigation.goBack()}
-      >
+      <Pressable style={styles.container} onPress={() => navigation.goBack()}>
         {/* Image View - Consider adding Zoom/Pan library later */}
         <Image
           source={{ uri: imageUrl }}
@@ -50,15 +47,14 @@ export default function FullImageScreen() {
         />
         {/* Explicit Close Button - stops propagation so tapping X doesn't also trigger background press */}
         <Pressable
-           style={styles.closeButtonContainer}
-           onPress={(e) => {
-                e.stopPropagation(); // Prevent background press
-                navigation.goBack();
-            }}
+          style={styles.closeButtonContainer}
+          onPress={(e) => {
+            e.stopPropagation(); // Prevent background press
+            navigation.goBack();
+          }}
         >
           <Feather name="x" size={28} color={iconColor} />
         </Pressable>
-
       </Pressable>
     </SafeAreaView>
   );
@@ -71,17 +67,17 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     // Background color inherited or set on safeArea
   },
   fullImage: {
-    width: '100%',
-    height: '100%',
+    width: "100%",
+    height: "100%",
   },
   closeButtonContainer: {
-    position: 'absolute',
-    top: Platform.OS === 'android' ? 15 : 10, // Adjust based on testing with SafeAreaView
+    position: "absolute",
+    top: Platform.OS === "android" ? 15 : 10, // Adjust based on testing with SafeAreaView
     right: 15,
     padding: 10, // Increase tappable area
     zIndex: 10, // Ensure button is above image if overlap occurs

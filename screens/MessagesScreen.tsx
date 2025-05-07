@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback, } from "react"; // Added useCallback
+import React, { useEffect, useState, useCallback } from "react"; // Added useCallback
 import {
   View,
   Text,
@@ -12,11 +12,11 @@ import {
   Platform, // Added for platform-specific styles
 } from "react-native";
 import {
-    collection,
-    query,
-    onSnapshot,
-    where, // Import where for recommended query
-    Timestamp // Import Timestamp for type safety if lastUpdated is a Timestamp
+  collection,
+  query,
+  onSnapshot,
+  where, // Import where for recommended query
+  Timestamp, // Import Timestamp for type safety if lastUpdated is a Timestamp
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { Feather } from "@expo/vector-icons"; // Use Feather icons
@@ -46,20 +46,24 @@ export default function MessagesScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
-  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
-  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
-  const inputBorderColor = currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const inputBackgroundColor =
+    currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const inputBorderColor =
+    currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
-  const separatorColor = currentTheme.separator || (isDark ? "#3a3a3c" : "#e0e0e0");
-  const unreadColor = currentTheme.primary || 'blue'; // Color for unread dot/text emphasis
+  const separatorColor =
+    currentTheme.separator || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const unreadColor = currentTheme.primary || "blue"; // Color for unread dot/text emphasis
 
   useEffect(() => {
     const currentUser = auth.currentUser;
     if (!currentUser || !currentUser.uid) {
-        console.log("MessagesScreen: No user logged in.");
-        setLoading(false); // Stop loading if no user
-        setGroups([]); // Clear groups if logged out
-        return; // Exit if no user
+      console.log("MessagesScreen: No user logged in.");
+      setLoading(false); // Stop loading if no user
+      setGroups([]); // Clear groups if logged out
+      return; // Exit if no user
     }
 
     setLoading(true);
@@ -71,90 +75,109 @@ export default function MessagesScreen() {
     const q = query(collection(db, "groups"));
 
     console.log("MessagesScreen: Setting up groups listener...");
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-        console.log(`MessagesScreen: Snapshot received. Size: ${snapshot.size}`);
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        console.log(
+          `MessagesScreen: Snapshot received. Size: ${snapshot.size}`
+        );
         // Process docs async to fetch AsyncStorage data concurrently
-        const groupPromises = snapshot.docs.map(async (docSnap): Promise<Group | null> => {
+        const groupPromises = snapshot.docs.map(
+          async (docSnap): Promise<Group | null> => {
             const data = docSnap.data();
             const groupId = docSnap.id;
 
-             // Client-side filter (remove if using server-side where clause)
-             if (!data.members || !data.members.includes(userId)) {
-                return null; // User not a member
-             }
+            // Client-side filter (remove if using server-side where clause)
+            if (!data.members || !data.members.includes(userId)) {
+              return null; // User not a member
+            }
 
             // Calculate unread status
             let isUnread = false;
-            const lastUpdatedStr = data.lastUpdated instanceof Timestamp
-                                ? data.lastUpdated.toDate().toISOString() // Convert Timestamp to ISO string
-                                : data.lastUpdated; // Assume it's already a string or null/undefined
+            const lastUpdatedStr =
+              data.lastUpdated instanceof Timestamp
+                ? data.lastUpdated.toDate().toISOString() // Convert Timestamp to ISO string
+                : data.lastUpdated; // Assume it's already a string or null/undefined
 
-             if (lastUpdatedStr) { // Only check if lastUpdated exists
-                 try {
-                     const lastSeenKey = `lastSeen_${groupId}`;
-                     const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
-                     if (lastSeenStr) {
-                         // Compare dates: new Date() handles ISO strings
-                         isUnread = new Date(lastUpdatedStr) > new Date(lastSeenStr);
-                     } else {
-                         // If never seen, but there's an update timestamp, consider it unread
-                         isUnread = true;
-                     }
-                 } catch (error) {
-                     console.error(`Error reading AsyncStorage for group ${groupId}:`, error);
-                     // Default to not unread on error? Or maybe true? Depends on desired UX.
-                     isUnread = false;
-                 }
-             }
+            if (lastUpdatedStr) {
+              // Only check if lastUpdated exists
+              try {
+                const lastSeenKey = `lastSeen_${groupId}`;
+                const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
+                if (lastSeenStr) {
+                  // Compare dates: new Date() handles ISO strings
+                  isUnread = new Date(lastUpdatedStr) > new Date(lastSeenStr);
+                } else {
+                  // If never seen, but there's an update timestamp, consider it unread
+                  isUnread = true;
+                }
+              } catch (error) {
+                console.error(
+                  `Error reading AsyncStorage for group ${groupId}:`,
+                  error
+                );
+                // Default to not unread on error? Or maybe true? Depends on desired UX.
+                isUnread = false;
+              }
+            }
 
             return {
-                id: groupId,
-                title: data.title || 'Untitled Group',
-                members: data.members || [],
-                lastMessage: data.lastMessage || "",
-                lastUpdated: data.lastUpdated || null, // Store original format (Timestamp or string/null)
-                isUnread,
+              id: groupId,
+              title: data.title || "Untitled Group",
+              members: data.members || [],
+              lastMessage: data.lastMessage || "",
+              lastUpdated: data.lastUpdated || null, // Store original format (Timestamp or string/null)
+              isUnread,
             };
-        });
+          }
+        );
 
         try {
-            const resolvedGroupsNullable = await Promise.all(groupPromises);
-            const userGroups = resolvedGroupsNullable.filter(group => group !== null) as Group[];
+          const resolvedGroupsNullable = await Promise.all(groupPromises);
+          const userGroups = resolvedGroupsNullable.filter(
+            (group) => group !== null
+          ) as Group[];
 
-            // Sort groups by lastUpdated (most recent first)
-            const sorted = userGroups.sort((a, b) => {
-                const timeA = a.lastUpdated
-                            ? (a.lastUpdated instanceof Timestamp ? a.lastUpdated.toMillis() : new Date(a.lastUpdated).getTime())
-                            : 0;
-                const timeB = b.lastUpdated
-                            ? (b.lastUpdated instanceof Timestamp ? b.lastUpdated.toMillis() : new Date(b.lastUpdated).getTime())
-                            : 0;
-                 const validTimeA = isNaN(timeA) ? 0 : timeA;
-                 const validTimeB = isNaN(timeB) ? 0 : timeB;
-                return validTimeB - validTimeA; // Descending order
-            });
+          // Sort groups by lastUpdated (most recent first)
+          const sorted = userGroups.sort((a, b) => {
+            const timeA = a.lastUpdated
+              ? a.lastUpdated instanceof Timestamp
+                ? a.lastUpdated.toMillis()
+                : new Date(a.lastUpdated).getTime()
+              : 0;
+            const timeB = b.lastUpdated
+              ? b.lastUpdated instanceof Timestamp
+                ? b.lastUpdated.toMillis()
+                : new Date(b.lastUpdated).getTime()
+              : 0;
+            const validTimeA = isNaN(timeA) ? 0 : timeA;
+            const validTimeB = isNaN(timeB) ? 0 : timeB;
+            return validTimeB - validTimeA; // Descending order
+          });
 
-            setGroups(sorted);
-            console.log(`MessagesScreen: Groups state updated with ${sorted.length} groups.`);
-
+          setGroups(sorted);
+          console.log(
+            `MessagesScreen: Groups state updated with ${sorted.length} groups.`
+          );
         } catch (error) {
-             console.error("MessagesScreen: Error processing groups:", error);
-             // Optionally show an error to the user
+          console.error("MessagesScreen: Error processing groups:", error);
+          // Optionally show an error to the user
         } finally {
-            setLoading(false);
-            console.log("MessagesScreen: Loading set to false.");
+          setLoading(false);
+          console.log("MessagesScreen: Loading set to false.");
         }
-
-    }, (error) => {
+      },
+      (error) => {
         console.error("MessagesScreen: Error on groups listener:", error);
         Alert.alert("Error", "Could not load your chats.");
         setLoading(false);
-    });
+      }
+    );
 
     // Cleanup listener on unmount
     return () => {
-        console.log("MessagesScreen: Unsubscribing groups listener.");
-        unsubscribe();
+      console.log("MessagesScreen: Unsubscribing groups listener.");
+      unsubscribe();
     };
   }, []); // Run only on mount (or user change if auth logic was outside)
 
@@ -173,14 +196,19 @@ export default function MessagesScreen() {
   );
 
   // Format date for display
-  const formatDate = (dateInput: Timestamp | string | null | undefined): string => {
+  const formatDate = (
+    dateInput: Timestamp | string | null | undefined
+  ): string => {
     if (!dateInput) return "";
     let date: Date;
     try {
-         date = dateInput instanceof Timestamp ? dateInput.toDate() : new Date(dateInput);
-         if (isNaN(date.getTime())) return ""; // Return empty if date is invalid
+      date =
+        dateInput instanceof Timestamp
+          ? dateInput.toDate()
+          : new Date(dateInput);
+      if (isNaN(date.getTime())) return ""; // Return empty if date is invalid
     } catch (e) {
-        return ""; // Return empty on parsing error
+      return ""; // Return empty on parsing error
     }
 
     const now = new Date();
@@ -191,16 +219,23 @@ export default function MessagesScreen() {
     const isYesterday = date.toDateString() === yesterday.toDateString();
 
     if (isToday) {
-      return date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+      return date.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      });
     } else if (isYesterday) {
       return "Yesterday";
     } else {
       // Check if it's this year
-       if (date.getFullYear() === now.getFullYear()) {
-         return date.toLocaleDateString([], { month: "short", day: "numeric" }); // e.g. Mar 20
-       } else {
-         return date.toLocaleDateString([], { year: 'numeric', month: "short", day: "numeric" }); // e.g. Mar 20, 2024
-       }
+      if (date.getFullYear() === now.getFullYear()) {
+        return date.toLocaleDateString([], { month: "short", day: "numeric" }); // e.g. Mar 20
+      } else {
+        return date.toLocaleDateString([], {
+          year: "numeric",
+          month: "short",
+          day: "numeric",
+        }); // e.g. Mar 20, 2024
+      }
     }
   };
 
@@ -208,17 +243,28 @@ export default function MessagesScreen() {
   const handleOpenChat = async (group: Group) => {
     try {
       // Update lastSeen timestamp immediately
-      await AsyncStorage.setItem(`lastSeen_${group.id}`, new Date().toISOString());
+      await AsyncStorage.setItem(
+        `lastSeen_${group.id}`,
+        new Date().toISOString()
+      );
       // Optimistically update UI state to remove unread indicator
-      setGroups(prevGroups => prevGroups.map(g =>
-        g.id === group.id ? { ...g, isUnread: false } : g
-      ));
+      setGroups((prevGroups) =>
+        prevGroups.map((g) =>
+          g.id === group.id ? { ...g, isUnread: false } : g
+        )
+      );
       // Navigate
-      navigation.navigate("Chat", { groupId: group.id, groupName: group.title }); // Pass groupName
+      navigation.navigate("Chat", {
+        groupId: group.id,
+        groupName: group.title,
+      }); // Pass groupName
     } catch (error) {
-        console.error("Error updating lastSeen or navigating:", error);
-        // Still navigate even if AsyncStorage fails? Maybe.
-        navigation.navigate("Chat", { groupId: group.id, groupName: group.title });
+      console.error("Error updating lastSeen or navigating:", error);
+      // Still navigate even if AsyncStorage fails? Maybe.
+      navigation.navigate("Chat", {
+        groupId: group.id,
+        groupName: group.title,
+      });
     }
   };
 
@@ -230,8 +276,13 @@ export default function MessagesScreen() {
       activeOpacity={0.7}
     >
       {/* Avatar */}
-      <View style={[styles.avatarContainer, { backgroundColor: currentTheme.primary + '30' }]}>
-         <Feather name="users" size={22} color={currentTheme.primary} />
+      <View
+        style={[
+          styles.avatarContainer,
+          { backgroundColor: currentTheme.primary + "30" },
+        ]}
+      >
+        <Feather name="users" size={22} color={currentTheme.primary} />
         {/* Alternative: Initials - needs a helper function */}
         {/* <Text style={[styles.avatarText, { color: currentTheme.primary }]}>{getInitials(item.title)}</Text> */}
       </View>
@@ -239,10 +290,20 @@ export default function MessagesScreen() {
       {/* Text Content */}
       <View style={styles.textContainer}>
         <View style={styles.titleRow}>
-          <Text style={[styles.groupTitle, { color: currentTheme.textPrimary }, item.isUnread && styles.groupTitleUnread]}>
+          <Text
+            style={[
+              styles.groupTitle,
+              { color: currentTheme.textPrimary },
+              item.isUnread && styles.groupTitleUnread,
+            ]}
+          >
             {item.title}
           </Text>
-           {item.isUnread && <View style={[styles.unreadDot, { backgroundColor: unreadColor }]} />}
+          {item.isUnread && (
+            <View
+              style={[styles.unreadDot, { backgroundColor: unreadColor }]}
+            />
+          )}
         </View>
         <Text
           style={[
@@ -265,54 +326,98 @@ export default function MessagesScreen() {
 
   // --- Render Component ---
   return (
-    <SafeAreaView style={[styles.screenContainer, { backgroundColor: inputBackgroundColor }]}>
-    {/* <> */}
+    <SafeAreaView
+      style={[
+        styles.screenContainer,
+        { backgroundColor: inputBackgroundColor },
+      ]}
+    >
+      {/* <> */}
       <StatusBar
         translucent={false}
         backgroundColor={cardBackgroundColor}
         barStyle={isDark ? "light-content" : "dark-content"}
       />
-      <View style={[styles.headerContainer, { backgroundColor: cardBackgroundColor }]}>
-      {/* Search Bar */}
-      <View style={[styles.searchContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-           <Feather name="search" size={20} color={placeholderTextColor} style={styles.searchIcon} />
-           <TextInput
-             placeholder="Search chats..."
-             placeholderTextColor={placeholderTextColor}
-             value={search}
-             onChangeText={setSearch}
-             style={[styles.searchInput, { color: currentTheme.textPrimary }]}
-             returnKeyType="search"
-           />
-           {search.length > 0 && (
-              <TouchableOpacity onPress={() => setSearch('')} style={styles.clearSearchButton}>
-                  <Feather name="x-circle" size={16} color={placeholderTextColor} />
-              </TouchableOpacity>
-           )}
-         </View>
+      <View
+        style={[
+          styles.headerContainer,
+          { backgroundColor: cardBackgroundColor },
+        ]}
+      >
+        {/* Search Bar */}
+        <View
+          style={[
+            styles.searchContainer,
+            {
+              backgroundColor: inputBackgroundColor,
+              borderColor: inputBorderColor,
+            },
+          ]}
+        >
+          <Feather
+            name="search"
+            size={20}
+            color={placeholderTextColor}
+            style={styles.searchIcon}
+          />
+          <TextInput
+            placeholder="Search chats..."
+            placeholderTextColor={placeholderTextColor}
+            value={search}
+            onChangeText={setSearch}
+            style={[styles.searchInput, { color: currentTheme.textPrimary }]}
+            returnKeyType="search"
+          />
+          {search.length > 0 && (
+            <TouchableOpacity
+              onPress={() => setSearch("")}
+              style={styles.clearSearchButton}
+            >
+              <Feather name="x-circle" size={16} color={placeholderTextColor} />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* List or Loading/Empty State */}
       {loading ? (
-         <View style={styles.centerContainer}>
-           <ActivityIndicator size="large" color={currentTheme.primary} />
-         </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color={currentTheme.primary} />
+        </View>
       ) : (
         <FlatList
           data={filteredGroups}
           keyExtractor={(item) => item.id}
           renderItem={renderGroupRow}
           contentContainerStyle={styles.listContainer}
-          ItemSeparatorComponent={() => <View style={[styles.separator, { backgroundColor: separatorColor }]} />}
+          ItemSeparatorComponent={() => (
+            <View
+              style={[styles.separator, { backgroundColor: separatorColor }]}
+            />
+          )}
           showsVerticalScrollIndicator={false}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-               <Feather name="message-square" size={50} color={currentTheme.textSecondary} style={{ marginBottom: 15 }} />
-              <Text style={[styles.emptyText, { color: currentTheme.textSecondary }]}>
+              <Feather
+                name="message-square"
+                size={50}
+                color={currentTheme.textSecondary}
+                style={{ marginBottom: 15 }}
+              />
+              <Text
+                style={[
+                  styles.emptyText,
+                  { color: currentTheme.textSecondary },
+                ]}
+              >
                 You haven't joined any group chats yet.
               </Text>
               <TouchableOpacity onPress={() => navigation.navigate("Home")}>
-                <Text style={[styles.discoverLink, { color: currentTheme.primary }]}>Discover Events & Join Chats</Text>
+                <Text
+                  style={[styles.discoverLink, { color: currentTheme.primary }]}
+                >
+                  Discover Events & Join Chats
+                </Text>
               </TouchableOpacity>
             </View>
           }
@@ -325,21 +430,21 @@ export default function MessagesScreen() {
 // --- Styles ---
 const styles = StyleSheet.create({
   screenContainer: {
-      flex: 1,
+    flex: 1,
   },
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: 'center',
+    justifyContent: "center",
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === 'android' ? 15 : 10, // Adjust top padding
+    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
     paddingBottom: 10,
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
-    borderBottomColor: 'transparent', // Use theme border
+    borderBottomColor: "transparent", // Use theme border
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 3 },
         shadowOpacity: 0.12,
         shadowRadius: 6,
@@ -352,7 +457,7 @@ const styles = StyleSheet.create({
   },
   pageTitle: {
     fontSize: 24, // Slightly larger title
-    fontWeight: 'bold',
+    fontWeight: "bold",
     paddingHorizontal: 16, // Match list padding
     marginTop: 10,
     marginBottom: 10, // Less margin below title
@@ -368,15 +473,15 @@ const styles = StyleSheet.create({
     // Dynamic background and border color
   },
   searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: 25,
     paddingHorizontal: 12,
     borderWidth: 0,
     height: 42, // Slightly smaller search bar
   },
   searchIcon: {
-      marginRight: 8,
+    marginRight: 8,
   },
   searchInput: {
     flex: 1,
@@ -384,45 +489,47 @@ const styles = StyleSheet.create({
     fontSize: 16,
   },
   clearSearchButton: {
-     padding: 4,
-     marginLeft: 4,
+    padding: 4,
+    marginLeft: 4,
   },
   listContainer: {
-      paddingBottom: 20, // Space at the end of the list
-      flexGrow: 1, // Ensure empty component can center
+    paddingBottom: 20, // Space at the end of the list
+    flexGrow: 1, // Ensure empty component can center
   },
-  centerContainer: { // For Loading and Empty states
+  centerContainer: {
+    // For Loading and Empty states
     flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 20,
   },
-  loadingText: { // If needed
-     marginTop: 15,
-     fontSize: 16,
+  loadingText: {
+    // If needed
+    marginTop: 15,
+    fontSize: 16,
   },
   emptyContainer: {
     flex: 1, // Take up remaining space
     marginTop: 80, // Push down from search bar
-    alignItems: 'center',
-    justifyContent: 'center', // Center vertically in available space
+    alignItems: "center",
+    justifyContent: "center", // Center vertically in available space
     paddingHorizontal: 30,
   },
   emptyText: {
     fontSize: 16,
-    textAlign: 'center',
+    textAlign: "center",
     marginBottom: 15,
     lineHeight: 22,
   },
   discoverLink: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     // textDecorationLine: "underline", // Optional underline
   },
   // --- List Item Row Styles ---
   row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingVertical: 12,
     paddingHorizontal: 16, // Consistent horizontal padding
     // borderBottomWidth removed, using ItemSeparatorComponent
@@ -436,36 +543,36 @@ const styles = StyleSheet.create({
     width: 50, // Slightly larger avatar
     height: 50,
     borderRadius: 25,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginRight: 15, // More space after avatar
     // backgroundColor set dynamically (e.g., theme primary + opacity)
   },
   avatarIcon: {
-     // Style for Feather icon if needed
+    // Style for Feather icon if needed
   },
   // avatarText: { // Style for initials if used
   //    fontSize: 18,
   //    fontWeight: 'bold',
   // },
   textContainer: {
-      flex: 1, // Take remaining space
-      justifyContent: 'center', // Center text vertically if needed
+    flex: 1, // Take remaining space
+    justifyContent: "center", // Center text vertically if needed
   },
   titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 3, // Space between title and message
   },
   groupTitle: {
-      fontSize: 16,
-      fontWeight: '600', // Slightly bolder title
-      marginRight: 6, // Space before dot
-      // color set dynamically
+    fontSize: 16,
+    fontWeight: "600", // Slightly bolder title
+    marginRight: 6, // Space before dot
+    // color set dynamically
   },
-   groupTitleUnread: {
-     fontWeight: 'bold', // Make title bold if unread
-   },
+  groupTitleUnread: {
+    fontWeight: "bold", // Make title bold if unread
+  },
   unreadDot: {
     width: 9, // Slightly smaller dot
     height: 9,
@@ -473,17 +580,17 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically
   },
   lastMessage: {
-      fontSize: 14,
-      // color set dynamically
+    fontSize: 14,
+    // color set dynamically
   },
   lastMessageUnread: {
-     fontWeight: 'bold', // Make last message bold if unread
-     // Optionally change color too: color: currentTheme.textPrimary
+    fontWeight: "bold", // Make last message bold if unread
+    // Optionally change color too: color: currentTheme.textPrimary
   },
   dateText: {
-      fontSize: 12,
-      marginLeft: 10, // Space before date
-      textAlign: 'right', // Align date to the right
-      // color set dynamically
+    fontSize: 12,
+    marginLeft: 10, // Space before date
+    textAlign: "right", // Align date to the right
+    // color set dynamically
   },
 });

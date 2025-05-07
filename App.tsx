@@ -63,7 +63,11 @@ export default function App() {
       <NavigationContainer>
         <Stack.Navigator
           initialRouteName={initialRoute}
-          screenOptions={{ headerShown: false, animation: 'none', gestureEnabled: false, }}
+          screenOptions={{
+            headerShown: false,
+            animation: "none",
+            gestureEnabled: false,
+          }}
         >
           <Stack.Screen name="Splash" component={SplashScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
@@ -81,7 +85,10 @@ export default function App() {
           <Stack.Screen name="FullImage" component={FullImageScreen} />
           <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen name="HelpAndSupport" component={HelpAndSupportScreen} />
+          <Stack.Screen
+            name="HelpAndSupport"
+            component={HelpAndSupportScreen}
+          />
           <Stack.Screen name="AboutApp" component={AboutAppScreen} />
         </Stack.Navigator>
       </NavigationContainer>

@@ -32,13 +32,16 @@ export default function ForgotPasswordScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Theme variable fallbacks ---
-  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? '#1c1c1e' : '#ffffff');
-  const inputBackgroundColor = currentTheme.inputBackground || (isDark ? '#2c2c2e' : '#f0f0f0');
-  const inputBorderColor = currentTheme.inputBorder || (isDark ? '#444' : '#ddd');
-  const placeholderTextColor = currentTheme.textSecondary || '#8e8e93';
-  const iconColor = currentTheme.textSecondary || '#8e8e93';
-  const shadowColor = currentTheme.shadowColor || '#000';
-  const linkColor = currentTheme.primary || '#007AFF'; // Use primary for links generally
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const inputBackgroundColor =
+    currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
+  const inputBorderColor =
+    currentTheme.inputBorder || (isDark ? "#444" : "#ddd");
+  const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
+  const iconColor = currentTheme.textSecondary || "#8e8e93";
+  const shadowColor = currentTheme.shadowColor || "#000";
+  const linkColor = currentTheme.primary || "#007AFF"; // Use primary for links generally
 
   const handleReset = async () => {
     const trimmedEmail = email.trim();
@@ -56,115 +59,169 @@ export default function ForgotPasswordScreen() {
         `We’ve sent a password reset link to ${trimmedEmail} if an account exists. Please check your spam folder as well.`,
         [{ text: "OK", onPress: () => navigation.navigate("Login") }] // Navigate back to Login on OK
       );
-       // No need to navigate here if the alert handles it, or remove onPress and navigate here
-       // navigation.navigate("Login");
+      // No need to navigate here if the alert handles it, or remove onPress and navigate here
+      // navigation.navigate("Login");
     } catch (error: any) {
       console.error("Password Reset Error:", error);
       let errorMessage = "Could not send reset email. Please try again.";
-      if (error.code === 'auth/invalid-email') {
+      if (error.code === "auth/invalid-email") {
         errorMessage = "Please enter a valid email address.";
-      } else if (error.code === 'auth/user-not-found') {
+      } else if (error.code === "auth/user-not-found") {
         // Don't explicitly say user not found for security, the success message handles it
         // Log it internally if needed, but show generic success to user
-        console.log("Password reset attempt for non-existent user:", trimmedEmail);
+        console.log(
+          "Password reset attempt for non-existent user:",
+          trimmedEmail
+        );
         // Show success message anyway so attackers can't determine existing emails
-         Alert.alert(
-            "Check Your Inbox",
-            `If an account exists for ${trimmedEmail}, a password reset link has been sent. Please check your spam folder as well.`,
-            [{ text: "OK", onPress: () => navigation.navigate("Login") }]
-         );
-         // No need to set loading false here as alert handles navigation
-         return; // Exit function after showing alert
-      } else if (error.code === 'auth/too-many-requests') {
-         errorMessage = "Too many requests. Please wait a while before trying again.";
+        Alert.alert(
+          "Check Your Inbox",
+          `If an account exists for ${trimmedEmail}, a password reset link has been sent. Please check your spam folder as well.`,
+          [{ text: "OK", onPress: () => navigation.navigate("Login") }]
+        );
+        // No need to set loading false here as alert handles navigation
+        return; // Exit function after showing alert
+      } else if (error.code === "auth/too-many-requests") {
+        errorMessage =
+          "Too many requests. Please wait a while before trying again.";
       }
       Alert.alert("Password Reset Failed", errorMessage);
     } finally {
       // Set loading false only if an error occurred AND we didn't navigate away via success alert
-       if (!Alert.alert) { // Basic check, might need refinement depending on alert logic flow
-          setIsLoading(false);
-       }
-       // More robust: only set loading false in the error handler's Alert callback if needed,
-       // or rely on component unmounting on navigation. Let's simplify and set it here for now.
-       setIsLoading(false);
+      if (!Alert.alert) {
+        // Basic check, might need refinement depending on alert logic flow
+        setIsLoading(false);
+      }
+      // More robust: only set loading false in the error handler's Alert callback if needed,
+      // or rely on component unmounting on navigation. Let's simplify and set it here for now.
+      setIsLoading(false);
     }
   };
 
   return (
-     <SafeAreaView style={[styles.screenContainer, { backgroundColor: currentTheme.background }]}>
-       
-         <ScrollView
-           contentContainerStyle={styles.scrollContainer}
-           keyboardShouldPersistTaps="handled"
-           showsVerticalScrollIndicator={false}
-         >
-           {/* Logo Area */}
-           <View style={styles.logoContainer}>
-              <View style={[styles.logoCircle, { backgroundColor: currentTheme.primary + '20' }]}>
-                <Image
-                  source={require("../assets/wimbli-icon-bg.png")}
-                  style={styles.logoImage}
-                />
-              </View>
-             <Text style={[styles.appName, { color: currentTheme.primary }]}>Wimbli</Text>
-           </View>
+    <SafeAreaView
+      style={[
+        styles.screenContainer,
+        { backgroundColor: currentTheme.background },
+      ]}
+    >
+      <ScrollView
+        contentContainerStyle={styles.scrollContainer}
+        keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
+      >
+        {/* Logo Area */}
+        <View style={styles.logoContainer}>
+          <View
+            style={[
+              styles.logoCircle,
+              { backgroundColor: currentTheme.primary + "20" },
+            ]}
+          >
+            <Image
+              source={require("../assets/wimbli-icon-bg.png")}
+              style={styles.logoImage}
+            />
+          </View>
+          <Text style={[styles.appName, { color: currentTheme.primary }]}>
+            Wimbli
+          </Text>
+        </View>
 
-           {/* Card */}
-           <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
-             <Text style={[styles.title, { color: currentTheme.textPrimary }]}>Reset Your Password</Text>
-             <Text style={[styles.subtitle, { color: currentTheme.textSecondary }]}>
-                 Enter your account's email address and we'll send you a link to reset your password.
-             </Text>
+        {/* Card */}
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cardBackgroundColor, shadowColor: shadowColor },
+          ]}
+        >
+          <Text style={[styles.title, { color: currentTheme.textPrimary }]}>
+            Reset Your Password
+          </Text>
+          <Text
+            style={[styles.subtitle, { color: currentTheme.textSecondary }]}
+          >
+            Enter your account's email address and we'll send you a link to
+            reset your password.
+          </Text>
 
-             {/* Email Input */}
-             <View style={[styles.inputContainer, { backgroundColor: inputBackgroundColor, borderColor: inputBorderColor }]}>
-                <Feather name="mail" size={20} color={iconColor} style={styles.inputIcon} />
-               <TextInput
-                 placeholder="Enter your email address"
-                 placeholderTextColor={placeholderTextColor}
-                 style={[styles.textInput, { color: currentTheme.textPrimary }]}
-                 value={email}
-                 onChangeText={setEmail}
-                 keyboardType="email-address"
-                 autoCapitalize="none"
-                 autoComplete="email"
-                 textContentType="emailAddress"
-               />
-             </View>
+          {/* Email Input */}
+          <View
+            style={[
+              styles.inputContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderColor: inputBorderColor,
+              },
+            ]}
+          >
+            <Feather
+              name="mail"
+              size={20}
+              color={iconColor}
+              style={styles.inputIcon}
+            />
+            <TextInput
+              placeholder="Enter your email address"
+              placeholderTextColor={placeholderTextColor}
+              style={[styles.textInput, { color: currentTheme.textPrimary }]}
+              value={email}
+              onChangeText={setEmail}
+              keyboardType="email-address"
+              autoCapitalize="none"
+              autoComplete="email"
+              textContentType="emailAddress"
+            />
+          </View>
 
-             {/* Reset Button */}
-              <TouchableOpacity
-                  style={[
-                      styles.resetButton,
-                      { backgroundColor: currentTheme.primary },
-                      isLoading && styles.resetButtonDisabled
-                  ]}
-                  onPress={handleReset}
-                  disabled={isLoading}
-                  activeOpacity={0.8}
+          {/* Reset Button */}
+          <TouchableOpacity
+            style={[
+              styles.resetButton,
+              { backgroundColor: currentTheme.primary },
+              isLoading && styles.resetButtonDisabled,
+            ]}
+            onPress={handleReset}
+            disabled={isLoading}
+            activeOpacity={0.8}
+          >
+            {isLoading ? (
+              <ActivityIndicator
+                size="small"
+                color={currentTheme.buttonText || "#fff"}
+              />
+            ) : (
+              <Text
+                style={[
+                  styles.resetButtonText,
+                  { color: currentTheme.buttonText || "#fff" },
+                ]}
               >
-                  {isLoading ? (
-                      <ActivityIndicator size="small" color={currentTheme.buttonText || '#fff'} />
-                  ) : (
-                      <Text style={[styles.resetButtonText, { color: currentTheme.buttonText || '#fff' }]}>Send Reset Email</Text>
-                  )}
-              </TouchableOpacity>
+                Send Reset Email
+              </Text>
+            )}
+          </TouchableOpacity>
 
-             {/* Back to Login Link */}
-              <View style={styles.loginLinkContainer}>
-                 <TouchableOpacity onPress={() => navigation.replace("Login")}>
-                    <Text style={[styles.linkText, styles.linkHighlight, { color: linkColor }]}>
-                      Back to Login
-                    </Text>
-                 </TouchableOpacity>
-              </View>
-
-           </View>
-         </ScrollView>
-       {/* </KeyboardAvoidingView> */}
-     </SafeAreaView>
-   );
- }
+          {/* Back to Login Link */}
+          <View style={styles.loginLinkContainer}>
+            <TouchableOpacity onPress={() => navigation.replace("Login")}>
+              <Text
+                style={[
+                  styles.linkText,
+                  styles.linkHighlight,
+                  { color: linkColor },
+                ]}
+              >
+                Back to Login
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+      {/* </KeyboardAvoidingView> */}
+    </SafeAreaView>
+  );
+}
 
 // --- Styles --- (Adapted from Login/Signup)
 const styles = StyleSheet.create({
@@ -173,42 +230,42 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flexGrow: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: "center",
+    alignItems: "center",
     padding: 16,
   },
   logoContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     marginBottom: 30,
   },
   logoCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     marginBottom: 10,
     // backgroundColor set dynamically
   },
   logoImage: {
-     width: 90,
-     height: 90,
-     resizeMode: 'contain',
+    width: 90,
+    height: 90,
+    resizeMode: "contain",
   },
   appName: {
     fontSize: 32,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     // color set dynamically
   },
   card: {
-    width: '100%',
+    width: "100%",
     maxWidth: 400,
     borderRadius: 16,
     padding: 25,
     // backgroundColor set dynamically
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.15,
         shadowRadius: 12,
@@ -220,21 +277,21 @@ const styles = StyleSheet.create({
   },
   title: {
     fontSize: 24,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     marginBottom: 10, // Less space below title
-    textAlign: 'center',
+    textAlign: "center",
     // color set dynamically
   },
-   subtitle: {
-     fontSize: 15,
-     textAlign: 'center',
-     marginBottom: 25, // Space below subtitle
-     lineHeight: 21,
-     // color set dynamically
-   },
+  subtitle: {
+    fontSize: 15,
+    textAlign: "center",
+    marginBottom: 25, // Space below subtitle
+    lineHeight: 21,
+    // color set dynamically
+  },
   inputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderWidth: 0,
     borderRadius: 25,
     paddingHorizontal: 12,
@@ -243,7 +300,7 @@ const styles = StyleSheet.create({
     // backgroundColor, borderColor set dynamically
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -266,13 +323,13 @@ const styles = StyleSheet.create({
   resetButton: {
     paddingVertical: 14,
     borderRadius: 25, // Consistent rounded button
-    alignItems: 'center',
+    alignItems: "center",
     marginTop: 10, // Space above button
     marginBottom: 25, // Space below button
     // Dynamic background color
     ...Platform.select({
       ios: {
-        shadowColor: '#000',
+        shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 4,
@@ -283,23 +340,23 @@ const styles = StyleSheet.create({
     }),
   },
   resetButtonDisabled: {
-     opacity: 0.7,
+    opacity: 0.7,
   },
   resetButtonText: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: "bold",
     // color set dynamically
   },
   loginLinkContainer: {
-     alignItems: 'center', // Center the link
-     marginTop: 15,
-   },
+    alignItems: "center", // Center the link
+    marginTop: 15,
+  },
   linkText: {
     fontSize: 15,
     // color set dynamically
   },
   linkHighlight: {
-    fontWeight: '600',
+    fontWeight: "600",
     // color set dynamically (primary)
   },
 });

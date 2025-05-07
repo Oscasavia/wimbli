@@ -9,12 +9,13 @@ import {
   ScrollView,
   FlatList, // Keep import if used elsewhere, though not directly in this example output
   Modal,
-  Alert, // Keep import if used elsewhere
+  Alert,
   StatusBar,
   Pressable,
 } from "react-native";
 import { auth, db } from "../firebase";
 import { doc, getDocs, collection, query, where, getCountFromServer, onSnapshot, arrayRemove, updateDoc, deleteDoc} from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
+import { signOut, } from "firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const [userData, setUserData] = useState<any>(null);
   const [postCount, setPostCount] = useState(0);
   const [savedEventsCount, setSavedEventsCount] = useState(0);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isModalVisible, setModalVisible] = useState(false);
   const [isSettingsMenuVisible, setSettingsMenuVisible] = useState(false);
   const { theme } = useTheme();
@@ -132,6 +134,29 @@ const fetchUserAndCounts = async () => {
       following: userData?.followingCount || 0,
   };
 
+  const handleLogout = async () => {
+      if (isLoggingOut) return; // Prevent double taps
+      setIsLoggingOut(true);
+      try {
+        console.log("SettingsScreen: Signing out...");
+        await signOut(auth);
+        console.log("SettingsScreen: Sign out successful. Resetting navigation to Login.");
+  
+        // Reset navigation stack to Login screen after successful sign out
+        navigation.reset({
+            index: 0,
+            // Make sure 'Login' is the correct name of your Login screen route
+            routes: [{ name: 'Login' }],
+        });
+        // No need to set isLoggingOut back to false, as the component will unmount.
+  
+      } catch (error: any) {
+        console.error("SettingsScreen: Logout Error:", error);
+        Alert.alert("Logout Error", error.message);
+        setIsLoggingOut(false); // Only reset on error
+      }
+    };
+
   const handleDeletePost = async (postId: string) => {
     try {
       // Delete the post from Firestore
@@ -182,8 +207,8 @@ const fetchUserAndCounts = async () => {
           onPress={toggleSettingsMenu}
         >
           <Feather
-            name="chevron-down"
-            size={28} // Slightly larger icon
+            name="more-vertical"
+            size={25} // Slightly larger icon
             color={currentTheme.textPrimary}
           />
         </TouchableOpacity>
@@ -359,11 +384,11 @@ const fetchUserAndCounts = async () => {
 
              {/* Add other menu items here if needed */}
              {/* Example: Logout (ensure handleLogout is defined) */}
-             {/* <View style={[styles.menuSeparator, {backgroundColor: currentTheme.inputBorder}]} />
-                  <TouchableOpacity style={styles.settingsMenuItem} onPress={() => { toggleSettingsMenu(); handleLogout(); }}>
-                      <Feather name="log-out" size={18} color={currentTheme.error || 'red'} style={styles.settingsMenuIcon} />
-                      <Text style={[styles.settingsMenuItemText, { color: currentTheme.error || 'red' }]}>Logout</Text>
-                  </TouchableOpacity> */}
+             <View style={[styles.menuSeparator, {backgroundColor: currentTheme.inputBorder}]} />
+              <TouchableOpacity style={styles.settingsMenuItem} onPress={() => { toggleSettingsMenu(); handleLogout(); }}>
+                  <Feather name="log-out" size={18} color={currentTheme.error || 'red'} style={styles.settingsMenuIcon} />
+                  <Text style={[styles.settingsMenuItemText, { color: currentTheme.error || 'red' }]}>Logout</Text>
+              </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -553,7 +578,7 @@ const styles = StyleSheet.create({
   // --- Settings Menu Modal Styles ---
   settingsMenuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.3)", // Semi-transparent overlay
+    backgroundColor: "rgba(0, 0, 0, 0.1.5)", // Semi-transparent overlay
     // Align menu to top-right (adjust based on icon position)
     // justifyContent: "flex-start",
     // alignItems: "flex-end",

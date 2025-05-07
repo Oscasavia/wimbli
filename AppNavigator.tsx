@@ -12,8 +12,8 @@ import {
 } from "react-native";
 import { useTheme } from "./ThemeContext"; // Adjust path if needed
 import { lightTheme, darkTheme } from "./themeColors"; // Adjust path if needed
-import * as NavigationBar from 'expo-navigation-bar';
-import { useEffect } from 'react';
+import * as NavigationBar from "expo-navigation-bar";
+import { useEffect } from "react";
 
 // Import Screen Components
 import HomeScreen from "./screens/HomeScreen";
@@ -25,24 +25,30 @@ import MessagesScreen from "./screens/MessagesScreen";
 
 const Tab = createBottomTabNavigator();
 
-export default function AppNavigator() { // Or AppTabs
+export default function AppNavigator() {
+  // Or AppTabs
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // Define theme colors with fallbacks for clarity
-  const activeColor = currentTheme.primary || (isDark ? darkTheme.primary : lightTheme.primary);
-  const inactiveColor = currentTheme.textSecondary || (isDark ? '#a0a0a0' : 'gray');
-  const barBackgroundColor = currentTheme.cardBackground || (isDark ? '#1c1c1e' : '#ffffff');
-  const topBorderColor = currentTheme.separator || (isDark ? '#3a3a3c' : '#e0e0e0');
-  const createButtonBg = currentTheme.primary || (isDark ? darkTheme.primary : lightTheme.primary);
-  const createButtonIconColor = currentTheme.buttonText || '#ffffff';
-  const shadowColor = currentTheme.shadowColor || '#000';
+  const activeColor =
+    currentTheme.primary || (isDark ? darkTheme.primary : lightTheme.primary);
+  const inactiveColor =
+    currentTheme.textSecondary || (isDark ? "#a0a0a0" : "gray");
+  const barBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
+  const topBorderColor =
+    currentTheme.separator || (isDark ? "#3a3a3c" : "#e0e0e0");
+  const createButtonBg =
+    currentTheme.primary || (isDark ? darkTheme.primary : lightTheme.primary);
+  const createButtonIconColor = currentTheme.buttonText || "#ffffff";
+  const shadowColor = currentTheme.shadowColor || "#000";
 
   useEffect(() => {
-    if (Platform.OS === 'android') {
+    if (Platform.OS === "android") {
       NavigationBar.setBackgroundColorAsync(barBackgroundColor);
-      NavigationBar.setButtonStyleAsync(isDark ? 'light' : 'dark'); // Adjust button icons for visibility
+      NavigationBar.setButtonStyleAsync(isDark ? "light" : "dark"); // Adjust button icons for visibility
     }
   }, [barBackgroundColor, isDark]);
 
@@ -53,7 +59,7 @@ export default function AppNavigator() { // Or AppTabs
         headerShown: false, // Keep headers managed by individual screens or stack navigators
         tabBarShowLabel: true, // **Enable labels**
         tabBarStyle: {
-          height: Platform.OS === 'ios' ? 65 : 60, // Adjust height (consider labels)
+          height: Platform.OS === "ios" ? 65 : 60, // Adjust height (consider labels)
           backgroundColor: barBackgroundColor,
           borderTopColor: "transparent",
           // Shadow (adjust as needed)
@@ -74,11 +80,11 @@ export default function AppNavigator() { // Or AppTabs
         tabBarInactiveTintColor: inactiveColor,
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '600', // Make labels slightly bolder
-          marginBottom: Platform.OS === 'ios' ? 0 : 5, // Adjust label spacing
+          fontWeight: "600", // Make labels slightly bolder
+          marginBottom: Platform.OS === "ios" ? 0 : 5, // Adjust label spacing
         },
         tabBarIcon: ({ focused, color, size }) => {
-          let iconName: keyof typeof Feather.glyphMap = 'home'; // Default icon
+          let iconName: keyof typeof Feather.glyphMap = "home"; // Default icon
           const iconSize = focused ? size + 1 : size; // Slightly larger when focused
 
           switch (route.name) {
@@ -98,9 +104,9 @@ export default function AppNavigator() { // Or AppTabs
               iconName = "user";
               break;
             // Add Settings back if needed
-             case "Settings":
-               iconName = "settings";
-               break;
+            case "Settings":
+              iconName = "settings";
+              break;
             default:
               iconName = "circle"; // Fallback Feather icon
           }
@@ -119,14 +125,14 @@ export default function AppNavigator() { // Or AppTabs
           return (
             <Pressable
               {...props} // This passes down crucial props like onPress, style, accessibilityState
-              android_ripple={{ color: 'transparent' }} // Disable ripple effect on Android
+              android_ripple={{ color: "transparent" }} // Disable ripple effect on Android
               // For iOS: Pressable by default dims its children (icon, label) on press.
               // Setting opacity to 1 here attempts to keep the Pressable container itself fully opaque.
               // However, this might not prevent the children-dimming behavior.
               // If child dimming on iOS persists, it's a stubborn default of Pressable.
               style={({ pressed }) => [
                 props.style, // Apply default styling from the navigator for layout
-                Platform.OS === 'ios' && pressed ? { opacity: 1 } : {},
+                Platform.OS === "ios" && pressed ? { opacity: 1 } : {},
               ]}
             >
               {props.children}
@@ -137,7 +143,11 @@ export default function AppNavigator() { // Or AppTabs
     >
       {/* Define Tab Screens */}
       <Tab.Screen name="Home" component={HomeScreen} />
-      <Tab.Screen name="Posts" component={ManagePostsScreen} options={{ title: 'My Posts'}}/>
+      <Tab.Screen
+        name="Posts"
+        component={ManagePostsScreen}
+        options={{ title: "My Posts" }}
+      />
 
       {/* Middle Create Button */}
       <Tab.Screen
@@ -148,16 +158,21 @@ export default function AppNavigator() { // Or AppTabs
           tabBarButton: (buttonProps) => (
             <TouchableOpacity
               style={[
-                  styles.createButtonWrapper,
-                  // Add shadow using theme color if needed
-                  // styles.createButtonShadow, { shadowColor }
+                styles.createButtonWrapper,
+                // Add shadow using theme color if needed
+                // styles.createButtonShadow, { shadowColor }
               ]}
               onPress={buttonProps.onPress} // Use onPress from props
               activeOpacity={1}
             >
-               <View style={[styles.createButton, { backgroundColor: createButtonBg }]}>
-                  <Feather name="plus" size={28} color={createButtonIconColor} />
-               </View>
+              <View
+                style={[
+                  styles.createButton,
+                  { backgroundColor: createButtonBg },
+                ]}
+              >
+                <Feather name="plus" size={28} color={createButtonIconColor} />
+              </View>
             </TouchableOpacity>
           ),
         }}
@@ -165,18 +180,19 @@ export default function AppNavigator() { // Or AppTabs
 
       <Tab.Screen name="Messages" component={MessagesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
-       {/* Add Settings back if needed */}
-       {/* <Tab.Screen name="Settings" component={SettingsScreen} /> */}
+      {/* Add Settings back if needed */}
+      {/* <Tab.Screen name="Settings" component={SettingsScreen} /> */}
     </Tab.Navigator>
   );
 }
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  createButtonWrapper: { // Wrapper to help with positioning/shadow if needed
-      flex: 1, // Take up tab space
-      alignItems: 'center',
-      // backgroundColor: 'transparent', // Can help avoid layout issues
+  createButtonWrapper: {
+    // Wrapper to help with positioning/shadow if needed
+    flex: 1, // Take up tab space
+    alignItems: "center",
+    // backgroundColor: 'transparent', // Can help avoid layout issues
   },
   createButton: {
     // Position button slightly elevated
@@ -184,11 +200,11 @@ const styles = StyleSheet.create({
     width: 65, // Slightly smaller FAB
     height: 65,
     borderRadius: 32.5, // Keep it circular
-    backgroundColor: '#00ACC1', // Set dynamically
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "#00ACC1", // Set dynamically
+    justifyContent: "center",
+    alignItems: "center",
     // Enhanced Shadow/Elevation
-    shadowColor: '#000', // Set dynamically
+    shadowColor: "#000", // Set dynamically
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 5,
