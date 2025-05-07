@@ -358,12 +358,12 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically (cardBackground)
   },
   firstRow: {
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: 25,
+    borderTopRightRadius: 25,
   },
   lastRow: {
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
+    borderBottomLeftRadius: 25,
+    borderBottomRightRadius: 25,
     borderBottomWidth: 0, // No bottom border on the last item
   },
   settingLeft: {

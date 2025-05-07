@@ -498,7 +498,7 @@ const styles = StyleSheet.create({
   // Reusable Card Style
   card: {
     width: "100%",
-    borderRadius: 12,
+    borderRadius: 25,
     padding: 18,
     marginBottom: 16, // Space between cards
     // Consistent shadow using theme color or fallback

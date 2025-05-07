@@ -24,7 +24,8 @@ export const lightTheme = {
 };
 
 export const darkTheme = {
-    primary: '#4DB6AC',       // Slightly lighter Teal for dark
+    // primary: '#4DB6AC',       // Slightly lighter Teal for dark
+    primary: '#5E35B1',
     secondary: '#FFAB91',     // Slightly lighter Orange/Coral for dark
     accent: '#FFD54F',        // Slightly lighter Yellow/Gold for dark
     background: '#121212',    // Dark Background
