@@ -696,10 +696,10 @@ const styles = StyleSheet.create({
     marginBottom: 5, // More space between inputs
     height: 50, // Consistent height
     // backgroundColor, borderColor set dynamically
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 1,
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.15,
+    // shadowRadius: 3,
+    // elevation: 1,
   },
   textAreaContainer: {
     flexDirection: "row",
@@ -710,10 +710,10 @@ const styles = StyleSheet.create({
     marginBottom: 5, // More space between inputs
     height: 100, // Consistent height
     // backgroundColor, borderColor set dynamically
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 1,
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.15,
+    // shadowRadius: 3,
+    // elevation: 1,
   },
   input: {
     flex: 1,
@@ -737,10 +737,10 @@ const styles = StyleSheet.create({
     overflow: "hidden", // Ensure border radius clips the picker background on Android
     justifyContent: "center", // Center picker vertically for better alignment
     height: 55, // Set fixed height consistent with inputs
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 1,
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.15,
+    // shadowRadius: 3,
+    elevation: 0.5,
   },
   picker: {
     width: "100%",
@@ -758,10 +758,10 @@ const styles = StyleSheet.create({
     marginBottom: 10, // More space between inputs
     height: 55, // Consistent height
     // backgroundColor, borderColor set dynamically
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.15,
-    shadowRadius: 3,
-    elevation: 1,
+    // shadowOffset: { width: 0, height: 1 },
+    // shadowOpacity: 0.15,
+    // shadowRadius: 3,
+    elevation: 0.5,
   },
   dateTrigger: {
     // flex: 1,

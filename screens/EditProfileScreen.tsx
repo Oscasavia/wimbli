@@ -7,6 +7,8 @@ import {
   TouchableOpacity,
   Image,
   Alert,
+  StatusBar,
+  Platform,
   ScrollView,
   Modal,
   ActivityIndicator, // Added for loading state
@@ -71,6 +73,8 @@ export default function EditProfileScreen() {
   const currentTheme = isDark ? darkTheme : lightTheme;
 
   // --- Assume these are defined in your themeColors.js ---
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#1c1c1e" : "#ffffff");
   const inputBackgroundColor =
     currentTheme.inputBackground || (isDark ? "#2c2c2e" : "#f0f0f0");
   const chipBackgroundColor =
@@ -267,9 +271,29 @@ export default function EditProfileScreen() {
   const displayPicture = profilePictureUri || profilePictureUrl; // Show local change immediately
 
   return (
-    <SafeAreaView
-      style={[styles.safeArea, { backgroundColor: currentTheme.background }]}
-    >
+    <SafeAreaView style={{ flex: 1, backgroundColor: currentTheme.background }}>
+      <StatusBar
+        translucent={false}
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
+      <View
+        style={[styles.screen, { backgroundColor: currentTheme.background }]}
+      >
+        {/* Screen Title */}
+        <View
+          style={[
+            styles.headerContainer,
+            { backgroundColor: cardBackgroundColor },
+          ]}
+        >
+          <Text
+            style={[styles.screenTitle, { color: currentTheme.textPrimary }]}
+          >
+            Edit Profile
+          </Text>
+        </View>
+      </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         keyboardShouldPersistTaps="handled" // Dismiss keyboard when tapping outside inputs
@@ -468,8 +492,40 @@ export default function EditProfileScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: {
-    flex: 1,
+  screen: {
+    // flex: 1,
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent", // Use theme border
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: "1.9%",
+    marginBottom: 4,
+    // paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
   loadingContainer: {
     flex: 1,
@@ -528,22 +584,27 @@ const styles = StyleSheet.create({
     marginTop: 15, // Space above labels
   },
   input: {
-    borderWidth: 1, // Use border instead of just shadow for inputs
+    borderWidth: 0,
     paddingHorizontal: 15,
     paddingVertical: 12,
-    borderRadius: 10, // Consistent border radius
+    // borderRadius: 10,
+    borderRadius: 25,
     fontSize: 16,
   },
   textArea: {
-    height: 120, // Taller text area
+    height: 90, // Taller text area
     textAlignVertical: "top", // Align text to top for multiline
   },
   chipContainerWrapper: {
-    borderRadius: 10,
-    borderWidth: 1, // Border for the container
+    borderRadius: 25,
+    borderWidth: 0, // Border for the container
     padding: 10,
     marginTop: 8,
     // Background and border colors set dynamically
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.15,
+    shadowRadius: 3,
+    elevation: 3,
   },
   chipContainer: {
     flexDirection: "row",
