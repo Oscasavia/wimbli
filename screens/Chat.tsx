@@ -12,6 +12,7 @@ import {
   ActivityIndicator, // Added for potential avatar loading
   Pressable, // Use pressable for better feedback control if needed
   Alert, // Keep Alert import
+  AlertButton,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native"; // Added useNavigation
 import {
@@ -25,6 +26,9 @@ import {
   getDoc,
   setDoc,
   updateDoc, // Added updateDoc for potential use
+  deleteDoc, // <-- ADDED
+  limit,      // <-- ADDED
+  getDocs,    // <-- ADDED (will be needed for querying last message)
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
 import { useTheme } from "../ThemeContext";
@@ -290,19 +294,20 @@ export default function Chat() {
     setReplyingTo(null); // Clear reply state optimistically
 
     try {
-      // Add the message to the subcollection
-      await addDoc(
+      // Add the message to the subcollection and get its reference
+      const messageDocRef = await addDoc(
         collection(db, "groups", groupId, "messages"),
         newMessageData
       );
 
-      // Update the parent group document's last message/timestamp
+      // Update the parent group document's last message/timestamp AND lastMessageId
       await updateDoc(doc(db, "groups", groupId), {
-        lastMessage: trimmedInput, // Store the new message text
-        lastUpdated: newMessageData.timestamp, // Store the new timestamp (as Timestamp)
+        lastMessage: trimmedInput,
+        lastUpdated: newMessageData.timestamp,
+        lastMessageId: messageDocRef.id, // <-- ADDED THIS
+        lastMessageSenderId: userId,
       });
 
-      // Scroll to end after sending (might need slight delay)
       setTimeout(
         () => flatListRef.current?.scrollToEnd({ animated: true }),
         100
@@ -310,21 +315,130 @@ export default function Chat() {
     } catch (error) {
       console.error("Error sending message:", error);
       Alert.alert("Error", "Could not send message.");
-      // Optional: Restore input/reply state if needed
       setInput(trimmedInput);
       setReplyingTo(replyingTo);
     }
+  };
+
+  const handleDeleteMessage = async (messageToDelete: Message) => {
+    const currentUserID = auth.currentUser?.uid;
+
+    // Ensure user is authenticated
+    if (!currentUserID) {
+      Alert.alert("Error", "Authentication required to delete messages.");
+      return;
+    }
+
+    // Ensure the user is the sender of the message
+    if (messageToDelete.senderId !== currentUserID) {
+      Alert.alert("Access Denied", "You can only delete your own messages.");
+      return;
+    }
+
+    const messageRef = doc(db, "groups", groupId, "messages", messageToDelete.id);
+
+    Alert.alert(
+      "Delete Message",
+      "Are you sure you want to permanently delete this message?",
+      [
+        {
+          text: "Cancel",
+          style: "cancel",
+        },
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              await deleteDoc(messageRef);
+              console.log("Message deleted successfully:", messageToDelete.id);
+
+              // Now, check if this was the last message in the group and update the group document
+              const groupDocRef = doc(db, "groups", groupId);
+              const groupDocSnap = await getDoc(groupDocRef);
+
+              if (groupDocSnap.exists()) {
+                const groupData = groupDocSnap.data();
+                // Check if the deleted message's ID matches the stored lastMessageId
+                if (groupData.lastMessageId === messageToDelete.id) {
+                  // The deleted message was the last one. Find the new last message.
+                  const messagesQuery = query(
+                    collection(db, "groups", groupId, "messages"),
+                    orderBy("timestamp", "desc"), // Get the newest first
+                    limit(1) // We only need one (the new latest)
+                  );
+
+                  const newLastMessagesSnap = await getDocs(messagesQuery);
+
+                  if (!newLastMessagesSnap.empty) {
+                    const newLastMessageDoc = newLastMessagesSnap.docs[0];
+                    const newLastMessageData = newLastMessageDoc.data();
+                    await updateDoc(groupDocRef, {
+                      lastMessage: newLastMessageData.text,
+                      lastUpdated: newLastMessageData.timestamp,
+                      lastMessageId: newLastMessageDoc.id,
+                    });
+                  } else {
+                    // No messages left in the group
+                    await updateDoc(groupDocRef, {
+                      lastMessage: "No messages yet.", // Or an empty string
+                      lastUpdated: Timestamp.now(), // Or a specific server timestamp
+                      lastMessageId: null, // Clear the ID
+                    });
+                  }
+                }
+              }
+            } catch (error) {
+              console.error("Error deleting message or updating group:", error);
+              Alert.alert("Error", "Could not delete the message. Please try again.");
+            }
+          },
+          style: "destructive",
+        },
+      ],
+      { cancelable: true } // Allows dismissing the alert by tapping outside (Android)
+    );
   };
 
   // --- Render Message Item ---
   const renderMessageItem = ({ item }: { item: Message }) => {
     const isSender = item.senderId === auth.currentUser?.uid;
 
+    const handleLongPress = () => {
+      const options: AlertButton[] = [
+        {
+          text: "Reply",
+          onPress: () => setReplyingTo(item),
+        },
+        // Add other options like "Copy Text" if desired in the future
+      ];
+
+      // Only add "Delete" option if the current user is the sender
+      if (isSender) {
+        options.push({
+          text: "Delete Message",
+          onPress: () => handleDeleteMessage(item), // Pass the full message item
+          style: "destructive", // iOS style for destructive actions
+        });
+      }
+
+      options.push({
+        text: "Cancel",
+        style: "cancel", // iOS style
+      });
+
+      Alert.alert(
+        "Message Options", // Title of the alert
+        `"${item.text.substring(0, 50)}${item.text.length > 50 ? "..." : ""}"`, // Optional: show a preview of the message text
+        options,
+        { cancelable: true }
+      );
+    };
+
     return (
-      <Pressable // Use Pressable for better control over feedback/gestures
+      <Pressable
         onPress={() => handleDoubleTapLike(item.id, item.likedBy)}
-        onLongPress={() => setReplyingTo(item)}
-        delayLongPress={300}
+        onLongPress={handleLongPress} // <--- MODIFIED HERE
+        delayLongPress={300} // Standard delay for long press
         style={[
           styles.messageRow,
           { justifyContent: isSender ? "flex-end" : "flex-start" },
@@ -340,10 +454,6 @@ export default function Chat() {
             }
             style={styles.avatar}
           />
-          // Alternative: Initials Placeholder
-          // <View style={[styles.avatar, styles.initialsAvatar, { backgroundColor: currentTheme.secondary + '50'}]}>
-          //    <Text style={[styles.initialsText, {color: currentTheme.secondary}]}>{getInitials(item.senderName)}</Text>
-          // </View>
         )}
 
         {/* Message Content Container */}

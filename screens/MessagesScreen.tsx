@@ -33,6 +33,7 @@ type Group = {
   members: string[];
   lastMessage?: string;
   lastUpdated?: Timestamp | string; // Allow both types
+  lastMessageSenderId?: string;
   isUnread?: boolean;
 };
 
@@ -86,47 +87,54 @@ export default function MessagesScreen() {
           async (docSnap): Promise<Group | null> => {
             const data = docSnap.data();
             const groupId = docSnap.id;
-
-            // Client-side filter (remove if using server-side where clause)
+        
+            // Client-side filter (keep or use server-side as noted)
             if (!data.members || !data.members.includes(userId)) {
               return null; // User not a member
             }
-
+        
             // Calculate unread status
             let isUnread = false;
-            const lastUpdatedStr =
-              data.lastUpdated instanceof Timestamp
-                ? data.lastUpdated.toDate().toISOString() // Convert Timestamp to ISO string
-                : data.lastUpdated; // Assume it's already a string or null/undefined
-
-            if (lastUpdatedStr) {
-              // Only check if lastUpdated exists
-              try {
-                const lastSeenKey = `lastSeen_${groupId}`;
-                const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
-                if (lastSeenStr) {
-                  // Compare dates: new Date() handles ISO strings
-                  isUnread = new Date(lastUpdatedStr) > new Date(lastSeenStr);
-                } else {
-                  // If never seen, but there's an update timestamp, consider it unread
-                  isUnread = true;
+            const lastMessageWasByCurrentUser = data.lastMessageSenderId === userId; // <-- CHECK HERE
+        
+            if (lastMessageWasByCurrentUser) {
+              isUnread = false; // If current user sent the last message, it's NOT unread for them
+            } else {
+              // Original logic if someone else sent the last message
+              const lastUpdatedStr =
+                data.lastUpdated instanceof Timestamp
+                  ? data.lastUpdated.toDate().toISOString()
+                  : data.lastUpdated;
+        
+              if (lastUpdatedStr) {
+                try {
+                  const lastSeenKey = `lastSeen_${groupId}`;
+                  const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
+                  if (lastSeenStr) {
+                    isUnread = new Date(lastUpdatedStr) > new Date(lastSeenStr);
+                  } else {
+                    // If never seen, but there's an update, consider it unread
+                    isUnread = true;
+                  }
+                } catch (error) {
+                  console.error(
+                    `Error reading AsyncStorage for group ${groupId}:`,
+                    error
+                  );
+                  isUnread = false; // Default to not unread on error
                 }
-              } catch (error) {
-                console.error(
-                  `Error reading AsyncStorage for group ${groupId}:`,
-                  error
-                );
-                // Default to not unread on error? Or maybe true? Depends on desired UX.
-                isUnread = false;
               }
+              // If lastUpdatedStr is null/undefined, and not sent by current user,
+              // it's likely an old chat or no messages, so isUnread remains false.
             }
-
+        
             return {
               id: groupId,
               title: data.title || "Untitled Group",
               members: data.members || [],
               lastMessage: data.lastMessage || "",
-              lastUpdated: data.lastUpdated || null, // Store original format (Timestamp or string/null)
+              lastUpdated: data.lastUpdated || null,
+              lastMessageSenderId: data.lastMessageSenderId || null, // <-- Get this from data
               isUnread,
             };
           }
