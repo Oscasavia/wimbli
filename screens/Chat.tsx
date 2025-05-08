@@ -13,6 +13,7 @@ import {
   Pressable, // Use pressable for better feedback control if needed
   Alert, // Keep Alert import
   AlertButton,
+  StatusBar,
 } from "react-native";
 import { useRoute, useNavigation } from "@react-navigation/native"; // Added useNavigation
 import {
@@ -27,10 +28,12 @@ import {
   setDoc,
   updateDoc, // Added updateDoc for potential use
   deleteDoc, // <-- ADDED
-  limit,      // <-- ADDED
-  getDocs,    // <-- ADDED (will be needed for querying last message)
+  limit, // <-- ADDED
+  getDocs, // <-- ADDED (will be needed for querying last message)
+  arrayRemove,
 } from "firebase/firestore";
 import { db, auth } from "../firebase";
+import { getFunctions, httpsCallable } from "firebase/functions";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Feather } from "@expo/vector-icons"; // Use Feather icons
@@ -94,8 +97,14 @@ export default function Chat() {
   const [loadingMessages, setLoadingMessages] = useState(true); // Loading state for messages
   const flatListRef = useRef<FlatList>(null);
   const { theme } = useTheme();
-  const currentTheme = theme === "dark" ? darkTheme : lightTheme;
+  const isDark = theme === "dark";
+  const currentTheme = isDark ? darkTheme : lightTheme;
   const lastTapTimeRef = useRef(0); // Ref for double-tap timing
+
+  // --- State for Group Actions ---
+  const [groupCreatorId, setGroupCreatorId] = useState<string | null>(null);
+  const [isProcessingGroupAction, setIsProcessingGroupAction] = useState(false); // Loading state for leave/delete
+  const [groupTitle, setGroupTitle] = useState(initialGroupName || "Group Chat");
 
   // --- Theme variable fallbacks ---
   const cardBackgroundColor =
@@ -115,26 +124,80 @@ export default function Chat() {
   const replyBgColor = theme === "dark" ? "#ffffff15" : "#00000010"; // Subtle reply background
   const replyBorderColor = theme === "dark" ? "#ffffff30" : "#00000020";
 
+  // --- Cloud Function Call Setup ---
+  const functions = getFunctions(); // Get Firebase Functions instance
+  // Make sure 'deleteGroupChat' exactly matches the name you deployed your function with
+  const callDeleteGroupChat = httpsCallable(functions, "deleteGroupChat");
+
   // Effect to set Navigation Header Title
   useEffect(() => {
-    const fetchGroupTitle = async () => {
+    const fetchGroupData = async () => {
+      if (!groupId) {
+        console.error("ChatScreen: groupId is missing!");
+        Alert.alert("Error", "Cannot load chat, group ID is missing.");
+        if (navigation.canGoBack()) navigation.goBack();
+        return;
+      }
       try {
-        const groupDoc = await getDoc(doc(db, "groups", groupId));
-        let title = initialGroupName || "Group Chat"; // Use passed name as fallback
-        if (groupDoc.exists()) {
-          title = groupDoc.data()?.title || title;
+        const groupRef = doc(db, "groups", groupId);
+        const groupSnap = await getDoc(groupRef);
+        let title = initialGroupName || "Group Chat";
+        let fetchedCreatorId: string | null = null;
+
+        if (groupSnap.exists()) {
+          const data = groupSnap.data();
+          title = data.title || title;
+          setGroupTitle(title);
+          fetchedCreatorId = data.createdBy || null; // Get creator ID
+          setGroupCreatorId(fetchedCreatorId);
+        } else {
+          console.warn(
+            `ChatScreen: Group document ${groupId} may have been deleted.`
+          );
+          Alert.alert("Group Not Found", "This group may have been deleted.");
+          if (navigation.canGoBack()) navigation.goBack();
+          return;
         }
-        navigation.setOptions({ title: title }); // Set header title
+
+        // Setup Header Button AFTER fetching creatorId
+        navigation.setOptions({
+          title: title,
+          headerRight: () => {
+            const currentUserId = auth.currentUser?.uid;
+            // Only show button if creator is known AND user is logged in
+            if (fetchedCreatorId && currentUserId) {
+              return (
+                <TouchableOpacity
+                  onPress={showGroupOptions}
+                  style={{ marginRight: 25, marginTop: 20 }}
+                >
+                  <Feather
+                    name="more-vertical"
+                    size={24}
+                    color={currentTheme.textPrimary}
+                  />
+                </TouchableOpacity>
+              );
+            }
+            return null; // No button if no creator/user
+          },
+        });
       } catch (error) {
-        console.error("Error fetching group title:", error);
-        navigation.setOptions({ title: initialGroupName || "Group Chat" }); // Set fallback on error
+        console.error("Error fetching group data:", error);
+        Alert.alert("Error", "Could not load group details.");
+        // Set fallback title even on error
+        navigation.setOptions({
+          title: initialGroupName || "Group Chat",
+          headerRight: () => null,
+        });
       }
     };
-    fetchGroupTitle();
-  }, [groupId, navigation, initialGroupName]); // Rerun if groupId changes
+    fetchGroupData();
+  }, [groupId, navigation, initialGroupName, currentTheme.textPrimary]); // Ensure dependencies are correct
 
   // Effect to Fetch Messages
   useEffect(() => {
+    if (!groupId) return; // Don't run if groupId isn't available
     setLoadingMessages(true);
     const messagesRef = collection(db, "groups", groupId, "messages");
     const q = query(messagesRef, orderBy("timestamp", "asc")); // Order ascending for FlatList
@@ -221,6 +284,117 @@ export default function Chat() {
       likeMessage(messageId, currentLikes);
     }
     lastTapTimeRef.current = now;
+  };
+
+  // --- Action: Show Group Options Alert ---
+  const showGroupOptions = () => {
+    const currentUser = auth.currentUser;
+    // Use the state variable groupCreatorId which should be set by useEffect
+    if (!currentUser || groupCreatorId === null) {
+      Alert.alert(
+        "Error",
+        "Cannot perform action. User or group info unavailable."
+      );
+      return;
+    }
+
+    const options: AlertButton[] = [];
+
+    if (currentUser.uid === groupCreatorId) {
+      // Creator sees "Delete Group"
+      options.push({
+        text: "Delete Group",
+        onPress: handleDeleteGroup, // Calls the Cloud Function handler
+        style: "destructive",
+      });
+    } else {
+      // Other members see "Leave Group"
+      options.push({
+        text: "Leave Group",
+        onPress: handleLeaveGroup, // Calls the client-side leave handler
+        style: "destructive",
+      });
+    }
+
+    options.push({ text: "Cancel", style: "cancel" });
+
+    Alert.alert("Group Options", "Choose an action for this group.", options, {
+      cancelable: true,
+    });
+  };
+
+  // --- Action: Handle Leave Group (Client-Side) ---
+  const handleLeaveGroup = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !groupId) {
+      Alert.alert("Error", "Could not identify user or group.");
+      return;
+    }
+    const userId = currentUser.uid;
+
+    Alert.alert("Leave Group", "Are you sure you want to leave this group?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          setIsProcessingGroupAction(true); // Show loading indicator
+          const groupRef = doc(db, "groups", groupId);
+          try {
+            await updateDoc(groupRef, { members: arrayRemove(userId) });
+            await AsyncStorage.removeItem(`lastSeen_${groupId}`); // Clear last seen
+            Alert.alert("Success", "You have left the group.");
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.navigate("Messages"); // Navigate back to messages list
+          } catch (error: any) {
+            console.error("Error leaving group:", error);
+            Alert.alert("Error", `Could not leave the group: ${error.message}`);
+          } finally {
+            setIsProcessingGroupAction(false); // Hide loading indicator
+          }
+        },
+      },
+    ]);
+  };
+
+  // --- Action: Handle Delete Group (Calls Cloud Function) ---
+  const handleDeleteGroup = () => {
+    // Alert handles async confirmation
+    if (!groupId) {
+      Alert.alert("Error", "Group ID is missing.");
+      return;
+    }
+    Alert.alert(
+      "Delete Group Permanently",
+      "This will delete the group and ALL messages for everyone. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Permanently",
+          style: "destructive",
+          onPress: async () => {
+            // Async action here
+            setIsProcessingGroupAction(true);
+            try {
+              console.log(
+                `Calling deleteGroupChat Cloud Function for group ${groupId}`
+              );
+              const result = await callDeleteGroupChat({ groupId: groupId }); // Pass data correctly
+              console.log("Cloud function result:", result.data);
+              Alert.alert("Success", "Group deletion initiated."); // Or use result message if available
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.navigate("Messages");
+            } catch (error: any) {
+              console.error("Error calling deleteGroupChat function:", error);
+              const message = error.message || "An unknown error occurred.";
+              Alert.alert("Error", `Failed to delete group: ${message}`);
+            } finally {
+              setIsProcessingGroupAction(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   const likeMessage = async (
@@ -335,7 +509,13 @@ export default function Chat() {
       return;
     }
 
-    const messageRef = doc(db, "groups", groupId, "messages", messageToDelete.id);
+    const messageRef = doc(
+      db,
+      "groups",
+      groupId,
+      "messages",
+      messageToDelete.id
+    );
 
     Alert.alert(
       "Delete Message",
@@ -389,7 +569,10 @@ export default function Chat() {
               }
             } catch (error) {
               console.error("Error deleting message or updating group:", error);
-              Alert.alert("Error", "Could not delete the message. Please try again.");
+              Alert.alert(
+                "Error",
+                "Could not delete the message. Please try again."
+              );
             }
           },
           style: "destructive",
@@ -569,9 +752,68 @@ export default function Chat() {
   return (
     // Use SafeAreaView edges if needed, especially for 'bottom' with KAV
     <SafeAreaView
-      style={[styles.container, { backgroundColor: currentTheme.background }]}
+      style={[
+        styles.screenContainer,
+        { backgroundColor: currentTheme.background },
+      ]}
       edges={["bottom"]}
     >
+      <StatusBar
+        backgroundColor={cardBackgroundColor}
+        barStyle={isDark ? "light-content" : "dark-content"}
+      />
+      {/* Screen Title */}
+      <View
+        style={[
+          styles.headerContainer,
+          { backgroundColor: cardBackgroundColor },
+        ]}
+      >
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.screenTitle,
+              {
+                color: currentTheme.textPrimary,
+                flex: 1,
+                textAlign: "left",
+                fontSize: 20,
+              },
+            ]}
+          >
+            {groupTitle}
+          </Text>
+          {auth.currentUser?.uid && groupCreatorId && (
+            <TouchableOpacity
+              onPress={showGroupOptions}
+              style={{ paddingHorizontal: 6 }}
+            >
+              <Feather
+                name="more-vertical"
+                size={22}
+                color={currentTheme.textPrimary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+      {isProcessingGroupAction && (
+        <View style={styles.actionOverlay}>
+          <ActivityIndicator
+            size="large"
+            color={currentTheme.primary || "blue"}
+          />
+          <Text
+            style={[
+              styles.actionOverlayText,
+              { color: currentTheme.background || "#fff" },
+            ]}
+          >
+            Processing...
+          </Text>
+        </View>
+      )}
       <KeyboardAvoidingView
         style={styles.keyboardAvoidingContainer}
         behavior={Platform.OS === "ios" ? "padding" : undefined} // "height" might also work
@@ -597,9 +839,9 @@ export default function Chat() {
             renderItem={renderMessageItem}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.listContentContainer}
-            onLayout={() =>
-              flatListRef.current?.scrollToEnd({ animated: false })
-            } // Scroll on initial layout
+            // onLayout={() =>
+            //   flatListRef.current?.scrollToEnd({ animated: false })
+            // } // Scroll on initial layout
             onContentSizeChange={() =>
               flatListRef.current?.scrollToEnd({ animated: true })
             } // Scroll on content size change
@@ -697,8 +939,40 @@ export default function Chat() {
 
 // --- Styles ---
 const styles = StyleSheet.create({
-  container: {
+  screenContainer: {
     flex: 1,
+  },
+  headerContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 15,
+    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
+    paddingBottom: 10,
+    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    borderBottomWidth: 1,
+    borderBottomColor: "transparent", // Use theme border
+    ...Platform.select({
+      ios: {
+        shadowColor: "#000",
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 6,
+      },
+    }),
+    zIndex: 10, // Ensures it stays above the list in case of overlap
+  },
+  screenTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    textAlign: "center",
+    marginTop: "1.9%",
+    marginBottom: 4,
+    // paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
   keyboardAvoidingContainer: {
     flex: 1,
@@ -866,6 +1140,19 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     // backgroundColor set dynamically
+  },
+  actionOverlay: {
+    // Style for the loading overlay during leave/delete
+    ...StyleSheet.absoluteFillObject, // Cover the whole screen
+    backgroundColor: "rgba(0, 0, 0, 0.65)", // Semi-transparent dark background
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000, // Ensure it's visually on top of everything else
+  },
+  actionOverlayText: {
+    marginTop: 15,
+    fontSize: 16,
+    fontWeight: "bold",
   },
   // sendIcon: { // Not strictly needed if only icon is used
   // },

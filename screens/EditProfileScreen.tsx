@@ -156,8 +156,9 @@ export default function EditProfileScreen() {
     });
 
     if (!result.canceled && result.assets && result.assets.length > 0) {
-      setProfilePictureUri(result.assets[0].uri); // Set local URI for display *before* upload
-      setProfilePictureUrl(result.assets[0].uri); // Temporarily update display URL
+      const localUri = result.assets[0].uri;
+      setProfilePictureUri(localUri); // Set ONLY the local URI state
+      // DO NOT: setProfilePictureUrl(localUri);
     }
   };
 
@@ -195,63 +196,59 @@ export default function EditProfileScreen() {
     }
 
     setIsSaving(true);
-    let finalProfilePictureUrl = profilePictureUrl; // Start with current URL
+    let urlToSave = profilePictureUrl;
+    let newUrlUploaded = false; // Flag to track if a new URL was successfully obtained
+    // let finalProfilePictureUrl = profilePictureUrl; // Start with current URL
 
     // If a new image was picked (local URI exists)
-    if (profilePictureUri && profilePictureUri !== profilePictureUrl) {
+    // Check if a new local image was picked
+    if (profilePictureUri) {
+      console.log(
+        "New profile picture URI selected, attempting upload:",
+        profilePictureUri
+      );
       const uploadedUrl = await uploadImage(profilePictureUri); // AWAIT the upload
+
       if (uploadedUrl) {
-        finalProfilePictureUrl = uploadedUrl; // Update to the new Storage URL
+        // Upload successful: Use the new permanent URL from Firebase Storage
+        urlToSave = uploadedUrl;
+        newUrlUploaded = true; // Mark that we have a new URL
+        console.log("Image uploaded successfully. New URL:", urlToSave);
       } else {
-        // Handle upload failure -  proceed without picture update and show message
+        // Upload failed: Keep the original URL. Alert the user.
+        // 'urlToSave' remains the value of 'profilePictureUrl' (the initially loaded one)
         Alert.alert(
           "Upload Error",
-          "Failed to upload profile picture. Profile will be updated without it."
+          "Failed to upload new profile picture. Previous picture (if any) will be kept."
         );
-        finalProfilePictureUrl = profilePictureUrl; // Keep the old URL
+        console.log("Image upload failed. Keeping original URL:", urlToSave);
+        // No change needed to urlToSave here, it already holds the original profilePictureUrl
       }
     }
-
     try {
-      // --- Update Firebase Auth Profile ---
-      const authUpdates: { displayName?: string; photoURL?: string | null } =
-        {};
-      if (username !== currentUser.displayName) {
-        authUpdates.displayName = username;
-      }
-      if (finalProfilePictureUrl !== currentUser.photoURL) {
-        // Be cautious updating photoURL in Auth if using it directly elsewhere
-        // Sometimes it's better to only rely on the Firestore URL
-        authUpdates.photoURL = finalProfilePictureUrl;
-      }
-
-      if (Object.keys(authUpdates).length > 0) {
-        await updateProfile(currentUser, authUpdates);
-      }
-
-      // --- Update Firestore User Document ---
-      const userDocRef = doc(db, "users", currentUser.uid);
-      const firestoreData = {
-        username: username,
-        bio: bio,
-        interests: interests,
-        profilePicture: finalProfilePictureUrl, // Save the *final* URL
-        // email: email, // Save email if editing
-        updatedAt: new Date(), // Good practice to track updates
-      };
-
-      // Use setDoc with merge:true or updateDoc. updateDoc is safer if doc must exist.
-      // Using setDoc ensures the document is created if it somehow didn't exist.
-      await setDoc(userDocRef, firestoreData, { merge: true });
-
-      Alert.alert("Success", "Profile updated!");
-      navigation.goBack(); // Go back to the profile screen
-    } catch (error: any) {
-      console.error("Error saving profile:", error);
-      Alert.alert("Error", `Failed to update profile: ${error.message}`);
+      await setDoc(
+        doc(db, "users", currentUser.uid),
+        {
+          username,
+          bio,
+          interests,
+          profilePicture: urlToSave,
+        },
+        { merge: true }
+      );
+  
+      await updateProfile(currentUser, {
+        displayName: username,
+        photoURL: urlToSave || undefined,
+      });
+  
+      Alert.alert("Success", "Profile updated successfully.");
+      navigation.goBack();
+    } catch (error) {
+      console.error("Error saving profile data:", error);
+      Alert.alert("Error", "Failed to save profile changes.");
     } finally {
-      setIsSaving(false);
-      setProfilePictureUri(null); // Clear local URI after save
+      setIsSaving(false); // 🔁 Always reset saving state
     }
   };
 

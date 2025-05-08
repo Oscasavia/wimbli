@@ -179,7 +179,22 @@ export default function AppNavigator() {
       />
 
       <Tab.Screen name="Messages" component={MessagesScreen} />
-      <Tab.Screen name="Profile" component={ProfileScreen} />
+      <Tab.Screen
+        name="Profile"
+        component={ProfileScreen}
+        listeners={({ navigation, route }) => ({
+          // <-- Add listeners here
+          tabPress: (e) => {
+            // Prevent default action to take control of the navigation
+            e.preventDefault();
+
+            // Navigate to this Profile tab, explicitly setting userId to undefined.
+            // This ensures that the ProfileScreen will default to showing the
+            // logged-in user's profile.
+            navigation.navigate("Profile", { userId: undefined });
+          },
+        })}
+      />
       {/* Add Settings back if needed */}
       {/* <Tab.Screen name="Settings" component={SettingsScreen} /> */}
     </Tab.Navigator>

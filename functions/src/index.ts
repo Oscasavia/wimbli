@@ -1,7 +1,9 @@
 // functions/src/index.ts (Using v2 SDK Syntax)
 
 // Import v2 scheduler trigger and logger
+import { onCall, HttpsError } from "firebase-functions/v2/https"; // For HTTPS Callable
 import { onSchedule } from "firebase-functions/v2/scheduler";
+import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger"; // Use v2 logger
 import * as admin from "firebase-admin";
 
@@ -16,61 +18,265 @@ const EXPIRATION_HOURS = 24;
 
 // Define the scheduled function using onSchedule (v2)
 export const cleanupExpiredPosts = onSchedule(
-    {
-        schedule: SCHEDULE,
-        // timeZone: TIMEZONE,
-        // You can add other options like memory, timeout here if needed
-        // memory: "512MiB",
-        // timeoutSeconds: 300, // 5 minutes (max is 540 for scheduled)
-    },
-    async (event) => { // The event object contains schedule info
-        // Use the v2 logger for better integration with Cloud Logging
-        logger.info(`Executing cleanupExpiredPosts function. Triggered at: ${event.scheduleTime}`);
+  {
+    schedule: SCHEDULE,
+    // timeZone: TIMEZONE,
+    // You can add other options like memory, timeout here if needed
+    // memory: "512MiB",
+    // timeoutSeconds: 300, // 5 minutes (max is 540 for scheduled)
+  },
+  async (event) => {
+    // The event object contains schedule info
+    // Use the v2 logger for better integration with Cloud Logging
+    logger.info(
+      `Executing cleanupExpiredPosts function. Triggered at: ${event.scheduleTime}`
+    );
 
-        // Calculate the timestamp threshold for deletion
-        const now = new Date();
-        const expirationThreshold = new Date(now.getTime() - (EXPIRATION_HOURS * 60 * 60 * 1000));
-        // Use admin SDK's Timestamp for Firestore comparison
-        const thresholdTimestamp = admin.firestore.Timestamp.fromDate(expirationThreshold);
+    // Calculate the timestamp threshold for deletion
+    const now = new Date();
+    const expirationThreshold = new Date(
+      now.getTime() - EXPIRATION_HOURS * 60 * 60 * 1000
+    );
+    // Use admin SDK's Timestamp for Firestore comparison
+    const thresholdTimestamp =
+      admin.firestore.Timestamp.fromDate(expirationThreshold);
 
-        logger.info(`Finding posts with 'date' field older than ${expirationThreshold.toISOString()}`);
+    logger.info(
+      `Finding posts with 'date' field older than ${expirationThreshold.toISOString()}`
+    );
 
-        const postsRef = db.collection("posts");
-        // Ensure your 'date' field is indexed for efficient querying if collection is large
-        const query = postsRef.where("date", "<", thresholdTimestamp);
+    const postsRef = db.collection("posts");
+    // Ensure your 'date' field is indexed for efficient querying if collection is large
+    const query = postsRef.where("date", "<", thresholdTimestamp);
 
-        try {
-            const snapshot = await query.get();
+    try {
+      const snapshot = await query.get();
 
-            if (snapshot.empty) {
-                logger.info("No expired posts found to delete.");
-                return; // Exit successfully
-            }
+      if (snapshot.empty) {
+        logger.info("No expired posts found to delete.");
+        return; // Exit successfully
+      }
 
-            logger.info(`Found ${snapshot.size} expired post(s) to delete.`);
+      logger.info(`Found ${snapshot.size} expired post(s) to delete.`);
 
-            // Use Batched Writes for deleting multiple documents efficiently (max 500 per batch)
-            // If you expect >500 deletes, you'll need to loop through batches.
-            const batch = db.batch();
-            snapshot.docs.forEach((doc) => {
-                 // Log date safely, checking if it exists and is a Timestamp
-                 const postDate = doc.data().date;
-                 const dateString = postDate?.toDate ? postDate.toDate().toISOString() : 'Invalid/Missing Date';
-                 logger.log(`Scheduling deletion for post: ${doc.id}, Event Date: ${dateString}`);
-                 batch.delete(doc.ref);
-            });
+      // Use Batched Writes for deleting multiple documents efficiently (max 500 per batch)
+      // If you expect >500 deletes, you'll need to loop through batches.
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        // Log date safely, checking if it exists and is a Timestamp
+        const postDate = doc.data().date;
+        const dateString = postDate?.toDate
+          ? postDate.toDate().toISOString()
+          : "Invalid/Missing Date";
+        logger.log(
+          `Scheduling deletion for post: ${doc.id}, Event Date: ${dateString}`
+        );
+        batch.delete(doc.ref);
+      });
 
-            // Commit the batch
-            await batch.commit();
-            logger.info(`Successfully deleted ${snapshot.size} expired post(s).`);
-            return; // Indicate success
-
-        } catch (error) {
-            logger.error("Error querying or deleting expired posts:", error);
-            // Consider more robust error reporting for production
-            return; // Indicate completion, even with errors
-        }
+      // Commit the batch
+      await batch.commit();
+      logger.info(`Successfully deleted ${snapshot.size} expired post(s).`);
+      return; // Indicate success
+    } catch (error) {
+      logger.error("Error querying or deleting expired posts:", error);
+      // Consider more robust error reporting for production
+      return; // Indicate completion, even with errors
     }
+  }
 );
+
+// --- NEW: HTTPS Callable Function to delete a group ---
+export const deleteGroupChat = onCall(async (request) => {
+  // request.auth will contain the authentication information of the user calling this function
+  if (!request.auth) {
+    logger.error("User not authenticated to delete group.");
+    throw new HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+
+  const groupId = request.data.groupId; // Data passed from your client { groupId: "the-group-id" }
+  const userId = request.auth.uid; // UID of the authenticated user calling the function
+
+  if (!groupId || typeof groupId !== "string") {
+    logger.error("Invalid groupId received:", groupId);
+    throw new HttpsError(
+      "invalid-argument",
+      "The function must be called with a valid 'groupId' argument."
+    );
+  }
+
+  logger.info(`Attempting to delete group: ${groupId} by user: ${userId}`);
+
+  const groupRef = db.collection("groups").doc(groupId);
+
+  try {
+    const groupDoc = await groupRef.get();
+
+    if (!groupDoc.exists) {
+      logger.warn(`Group ${groupId} not found for deletion.`);
+      // It's often better to return success if the goal is for the group to not exist,
+      // or throw 'not-found' if you want to explicitly signal it wasn't there.
+      // For simplicity, we'll throw 'not-found' to match the error you *thought* you were getting internally.
+      throw new HttpsError(
+        "not-found",
+        `Group with ID ${groupId} was not found.`
+      );
+    }
+
+    // Optional: Check if the calling user is the creator or has permission
+    const groupData = groupDoc.data();
+    if (groupData && groupData.createdBy !== userId) {
+      logger.error(
+        `User ${userId} is not the creator of group ${groupId}. Creator: ${groupData.createdBy}`
+      );
+      throw new HttpsError(
+        "permission-denied",
+        "You do not have permission to delete this group."
+      );
+    }
+
+    // --- CORRECTED MESSAGE DELETION SECTION ---
+    const messagesRef = groupRef.collection("messages");
+    let messagesDeletedCount = 0;
+    const batchSize = 400; // Keep batch size reasonable
+
+    // Helper function to delete a batch of documents from a query
+    async function deleteQueryBatch(
+      query: FirebaseFirestore.Query,
+      resolve: (value: unknown) => void,
+      reject: (reason?: any) => void // Add reject for error propagation
+    ) {
+      try {
+        const snapshot = await query.get();
+
+        if (snapshot.size === 0) {
+          // When there are no documents left, we are done
+          resolve(undefined);
+          return;
+        }
+
+        // Delete documents in a batch
+        const batch = db.batch();
+        snapshot.docs.forEach((doc) => {
+          batch.delete(doc.ref);
+        });
+        await batch.commit();
+        messagesDeletedCount += snapshot.size;
+        logger.info(
+          `Deleted a batch of ${snapshot.size} messages for group ${groupId}. Total deleted so far: ${messagesDeletedCount}`
+        );
+
+        // Recurse on the same query to process next batch.
+        process.nextTick(() => {
+          deleteQueryBatch(query, resolve, reject); // Pass reject
+        });
+      } catch (error) {
+        logger.error(
+          `Error during batch deletion for group ${groupId}:`,
+          error
+        );
+        reject(error); // Propagate the error
+      }
+    }
+
+    // Start the iterative deletion process for messages
+    logger.info(
+      `Starting deletion of messages subcollection for group ${groupId}.`
+    );
+    await new Promise((resolve, reject) => {
+      // Define the query to be used for each batch fetch.
+      // We pass the messagesRef itself, and the limit is applied inside deleteQueryBatch
+      // by re-creating the limited query based on the base messagesRef.
+      // A simpler way is to just pass the base messagesRef and always re-limit.
+      const limitedQuery = messagesRef.limit(batchSize);
+      deleteQueryBatch(limitedQuery, resolve, reject);
+    });
+
+    if (messagesDeletedCount > 0) {
+      logger.info(
+        `Successfully deleted all ${messagesDeletedCount} messages for group ${groupId}.`
+      );
+    } else {
+      logger.info(
+        `No messages found in group ${groupId} to delete, or deletion process already handled them.`
+      );
+    }
+    // --- END OF CORRECTED MESSAGE DELETION SECTION ---
+
+    // Now that messages are deleted, delete the group document itself
+    await groupRef.delete();
+    logger.info(
+      `Group document ${groupId} deleted successfully by user ${userId}.`
+    );
+
+    return {
+      success: true,
+      message: `Group ${groupId} and its messages deleted successfully.`,
+    };
+  } catch (error: any) {
+    logger.error(`Error in deleteGroupChat for group ${groupId}:`, error);
+    if (error instanceof HttpsError) {
+      throw error; // Re-throw HttpsError as is
+    }
+    // For other unexpected errors (e.g., from batch deletion)
+    throw new HttpsError(
+      "internal",
+      `An internal error occurred while deleting group ${groupId}. Details: ${error.message}`
+    );
+  }
+});
+
+export const cleanupSavedPosts = functions.firestore
+  .document("posts/{postId}")
+  .onDelete(async (snap, context) => {
+    const deletedPostId = snap.id; // ID of the post that was just deleted
+    const db = admin.firestore(); // Use admin SDK
+
+    logger.info(
+      `Post ${deletedPostId} deleted. Cleaning up savedPosts arrays.`
+    );
+
+    try {
+      const usersRef = db.collection("users");
+      const query = usersRef.where(
+        "savedPosts",
+        "array-contains",
+        deletedPostId
+      );
+      const snapshot = await query.get();
+
+      if (snapshot.empty) {
+        logger.info(`No users found who saved post ${deletedPostId}.`);
+        return null; // Nothing to do
+      }
+
+      // Use batch writes for efficiency if many users might have saved the post
+      const batch = db.batch();
+      snapshot.docs.forEach((doc) => {
+        logger.log(
+          `Removing post ${deletedPostId} from savedPosts for user ${doc.id}`
+        );
+        batch.update(doc.ref, {
+          savedPosts: admin.firestore.FieldValue.arrayRemove(deletedPostId),
+        });
+      });
+
+      await batch.commit();
+      logger.info(
+        `Successfully cleaned up savedPosts for post ${deletedPostId} for ${snapshot.size} users.`
+      );
+      return null;
+    } catch (error) {
+      logger.error(
+        `Error cleaning up savedPosts for deleted post ${deletedPostId}:`,
+        error
+      );
+      // Optional: Add more robust error handling/reporting
+      return null;
+    }
+  });
 
 // Add any other functions below, using v2 syntax (e.g., onCall, onDocumentWritten)

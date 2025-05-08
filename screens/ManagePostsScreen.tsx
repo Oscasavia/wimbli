@@ -131,7 +131,7 @@ export default function ManagePostsScreen() {
             try {
               // Optional: Add visual feedback during deletion
               await deleteDoc(doc(db, "posts", id));
-              await removeDeletedPostFromSaved(id);
+              // await removeDeletedPostFromSaved(id);
               // No need to manually remove from state, onSnapshot listener handles it
               // Alert.alert("Success", "Post deleted."); // Optional success message
             } catch (error) {

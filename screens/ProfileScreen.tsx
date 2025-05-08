@@ -12,16 +12,32 @@ import {
   Alert,
   StatusBar,
   Pressable,
+  Platform,
 } from "react-native";
 import { auth, db } from "../firebase";
-import { doc, getDocs, collection, query, where, getCountFromServer, onSnapshot, arrayRemove, updateDoc, deleteDoc} from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
-import { signOut, } from "firebase/auth";
+import {
+  doc,
+  getDocs,
+  collection,
+  query,
+  where,
+  getCountFromServer,
+  onSnapshot,
+  arrayRemove,
+  updateDoc,
+  deleteDoc,
+} from "firebase/firestore"; // Removed deleteDoc unless needed elsewhere
+import { signOut } from "firebase/auth";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRoute } from "@react-navigation/native";
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors"; // Assuming themeColors defines cardBackground, chipBackground, chipText etc.
-import { Feather, MaterialIcons, MaterialCommunityIcons } from "@expo/vector-icons"; // Added MaterialCommunityIcons for potential stats
+import {
+  Feather,
+  MaterialIcons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons"; // Added MaterialCommunityIcons for potential stats
 import { LinearGradient } from "expo-linear-gradient";
 
 export default function ProfileScreen() {
@@ -32,6 +48,7 @@ export default function ProfileScreen() {
   const [userData, setUserData] = useState<any>(null);
   const [postCount, setPostCount] = useState(0);
   const [savedEventsCount, setSavedEventsCount] = useState(0);
+  const currentUser = auth.currentUser; // Current logged-in user
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isModalVisible, setModalVisible] = useState(false);
   const [isSettingsMenuVisible, setSettingsMenuVisible] = useState(false);
@@ -41,8 +58,10 @@ export default function ProfileScreen() {
 
   // --- Assume these are defined in your themeColors.js ---
   // Add these fallbacks if they might be missing from your theme object
-  const cardBackgroundColor = currentTheme.cardBackground || (isDark ? "#2a2a2a" : "#ffffff");
-  const chipBackgroundColor = currentTheme.chipBackground || (isDark ? "#3a3a3a" : "#f0f0f0");
+  const cardBackgroundColor =
+    currentTheme.cardBackground || (isDark ? "#2a2a2a" : "#ffffff");
+  const chipBackgroundColor =
+    currentTheme.chipBackground || (isDark ? "#3a3a3a" : "#f0f0f0");
   const chipTextColor = currentTheme.chipText || currentTheme.textSecondary;
   const shadowColor = currentTheme.shadowColor || "#000"; // Define shadow color in theme if needed
 
@@ -61,52 +80,100 @@ export default function ProfileScreen() {
   useFocusEffect(
     useCallback(() => {
       let unsubscribeUser: () => void;
-let unsubscribePosts: () => void;
+      let unsubscribePosts: () => void;
 
-const fetchUserAndCounts = async () => {
-  setLoading(true);
-  setPostCount(0);
-  setSavedEventsCount(0);
+      const fetchUserAndCounts = async () => {
+        setLoading(true);
+        setPostCount(0); // Reset counts on focus/uid change
+        setSavedEventsCount(0);
+        setUserData(null); // Reset user data
 
-  try {
-    const uid = userId || auth.currentUser?.uid;
-    if (!uid) {
-      console.log("No UID found");
-      setLoading(false);
-      return;
-    }
+        try {
+          const uidToFetch = userId || auth.currentUser?.uid; // Use a different variable name
+          if (!uidToFetch) {
+            console.log("ProfileScreen: No UID available for fetching data.");
+            // Potentially navigate to login or show a 'logged out' state if it's the user's own profile
+            setLoading(false);
+            return;
+          }
 
-    // 🔁 Real-time listener for user data (e.g. saved posts)
-    unsubscribeUser = onSnapshot(doc(db, "users", uid), (docSnap) => {
-      if (docSnap.exists()) {
-        const data = docSnap.data();
-        setUserData(data);
+          // Real-time listener for user data
+          const userDocRef = doc(db, "users", uidToFetch);
+          unsubscribeUser = onSnapshot(
+            userDocRef,
+            (docSnap) => {
+              if (docSnap.exists()) {
+                const data = docSnap.data();
+                setUserData(data);
+                const savedIds = data.savedPosts || [];
+                setSavedEventsCount(savedIds.length);
+              } else {
+                console.log(
+                  `ProfileScreen: User document for UID ${uidToFetch} does not exist.`
+                );
+                setUserData(null); // Clear data if doc doesn't exist
+                setSavedEventsCount(0);
+              }
+            },
+            (error) => {
+              // It's good practice to add an error handler to listeners
+              console.error(
+                "ProfileScreen: Error in user data snapshot listener:",
+                error
+              );
+              // If permission denied, this might be where the error is caught if logout happens while focused
+              setUserData(null);
+              setSavedEventsCount(0);
+            }
+          );
 
-        const savedIds = data.savedPosts || [];
-        setSavedEventsCount(savedIds.length);
-        console.log(`✅ Real-time saved count: ${savedIds.length}`);
-      }
-    });
+          // Real-time listener for user-created posts
+          const postsCollectionRef = collection(db, "posts"); // Renamed for clarity
+          const postsQueryInstance = query(
+            postsCollectionRef,
+            where("createdBy", "==", uidToFetch)
+          );
+          unsubscribePosts = onSnapshot(
+            postsQueryInstance,
+            (snapshot) => {
+              setPostCount(snapshot.size);
+            },
+            (error) => {
+              // Error handler
+              console.error(
+                "ProfileScreen: Error in posts count snapshot listener:",
+                error
+              );
+              setPostCount(0);
+            }
+          );
+        } catch (error) {
+          console.error(
+            "ProfileScreen: Error in fetchUserAndCounts setup:",
+            error
+          );
+        } finally {
+          setLoading(false);
+        }
+      };
 
-    // 🔁 Real-time listener for user-created posts
-    const postsRef = collection(db, "posts");
-    const postsQuery = query(postsRef, where("createdBy", "==", uid));
-    unsubscribePosts = onSnapshot(postsQuery, (snapshot) => {
-      setPostCount(snapshot.size);
-      console.log(`✅ Real-time post count: ${snapshot.size}`);
-    });
+      fetchUserAndCounts();
 
-  } catch (error) {
-    console.error("Error loading profile data/counts:", error);
-  } finally {
-    setLoading(false);
-  }
-};
-
-    fetchUserAndCounts();
       // Clean-up function (optional)
-      // return () => { console.log("Profile screen unfocused"); };
-    }, [userId]) // Dependency array includes userId to refetch if navigating to a different profile
+      return () => {
+        console.log(
+          "ProfileScreen: Unfocusing or unmounting. Unsubscribing listeners."
+        );
+        if (unsubscribeUser) {
+          unsubscribeUser();
+          console.log("ProfileScreen: Unsubscribed from user data.");
+        }
+        if (unsubscribePosts) {
+          unsubscribePosts();
+          console.log("ProfileScreen: Unsubscribed from posts count.");
+        }
+      };
+    }, [userId, auth.currentUser])
   );
 
   if (loading) {
@@ -121,50 +188,61 @@ const fetchUserAndCounts = async () => {
 
   // --- Data Fallbacks ---
   const profilePictureUri = userData?.profilePicture || null; // Use null if undefined
-  const displayName = userData?.displayName || auth.currentUser?.displayName || "User";
-  const userEmail = userData?.email || auth.currentUser?.email || "No email provided";
   const userBio = userData?.bio || "No bio provided yet.";
   const userInterests = userData?.interests || [];
   // Placeholder Stats (replace with actual data if available)
   const stats = {
-      // posts: userData?.postCount || 0,
-      posts: postCount,
-      saved: savedEventsCount,
-      followers: userData?.followerCount || 0,
-      following: userData?.followingCount || 0,
+    // posts: userData?.postCount || 0,
+    posts: postCount,
+    saved: savedEventsCount,
+    followers: userData?.followerCount || 0,
+    following: userData?.followingCount || 0,
   };
 
+  const isOwnProfile = !userId || (currentUser && userId === currentUser.uid);
+
+  const displayName =
+    userData?.username || // 1. Try to get displayName from the fetched userData (could be own or other user)
+    (isOwnProfile ? currentUser?.displayName : undefined) || // 2. If it's own profile and userData.displayName was missing, try auth.currentUser.displayName
+    "User"; // 3. Fallback to "User" if neither of the above provided a value
+
+  const userEmail =
+    userData?.email || // 1. Try to get email from the fetched userData
+    (isOwnProfile ? currentUser?.email : undefined) || // 2. If it's own profile and userData.email was missing, try auth.currentUser.email
+    (isOwnProfile ? "No email provided" : "Email not available"); // 3. Fallback to a context-specific message
+
   const handleLogout = async () => {
-      if (isLoggingOut) return; // Prevent double taps
-      setIsLoggingOut(true);
-      try {
-        console.log("SettingsScreen: Signing out...");
-        await signOut(auth);
-        console.log("SettingsScreen: Sign out successful. Resetting navigation to Login.");
-  
-        // Reset navigation stack to Login screen after successful sign out
-        navigation.reset({
-            index: 0,
-            // Make sure 'Login' is the correct name of your Login screen route
-            routes: [{ name: 'Login' }],
-        });
-        // No need to set isLoggingOut back to false, as the component will unmount.
-  
-      } catch (error: any) {
-        console.error("SettingsScreen: Logout Error:", error);
-        Alert.alert("Logout Error", error.message);
-        setIsLoggingOut(false); // Only reset on error
-      }
-    };
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      console.log("ProfileScreen: Signing out..."); // Changed from SettingsScreen for clarity
+      // The listeners will be cleaned up by useFocusEffect when the component unmounts
+      // due to navigation.reset()
+      await signOut(auth);
+      console.log(
+        "ProfileScreen: Sign out successful. Resetting navigation to Login."
+      );
+
+      navigation.reset({
+        index: 0,
+        routes: [{ name: "Login" }],
+      });
+      // No need to setIsLoggingOut(false) if navigating away and unmounting.
+    } catch (error: any) {
+      console.error("ProfileScreen: Logout Error:", error);
+      Alert.alert("Logout Error", error.message);
+      setIsLoggingOut(false);
+    }
+  };
 
   const handleDeletePost = async (postId: string) => {
     try {
       // Delete the post from Firestore
       await deleteDoc(doc(db, "posts", postId));
-  
+
       // Remove the post ID from every user's savedPosts
       await removeDeletedPostFromSaved(postId);
-  
+
       Alert.alert("Deleted!", "Your post was removed.");
     } catch (error) {
       console.error("Failed to delete post:", error);
@@ -175,9 +253,12 @@ const fetchUserAndCounts = async () => {
   const removeDeletedPostFromSaved = async (deletedPostId: string) => {
     try {
       const usersRef = collection(db, "users");
-      const q = query(usersRef, where("savedPosts", "array-contains", deletedPostId));
+      const q = query(
+        usersRef,
+        where("savedPosts", "array-contains", deletedPostId)
+      );
       const snapshot = await getDocs(q);
-  
+
       for (const docSnap of snapshot.docs) {
         await updateDoc(docSnap.ref, {
           savedPosts: arrayRemove(deletedPostId),
@@ -189,10 +270,11 @@ const fetchUserAndCounts = async () => {
     }
   };
 
-
   return (
     // Use theme background instead of fixed gradient, or adjust gradient to use theme colors
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: currentTheme.background }]}>
+    <SafeAreaView
+      style={[styles.safeArea, { backgroundColor: currentTheme.background }]}
+    >
       <StatusBar
         backgroundColor={currentTheme.background}
         barStyle={isDark ? "light-content" : "dark-content"}
@@ -202,20 +284,25 @@ const fetchUserAndCounts = async () => {
         showsVerticalScrollIndicator={false}
       >
         {/* --- Settings Icon Button (Top Right) --- */}
-        <TouchableOpacity
-          style={styles.settingsIconContainer}
-          onPress={toggleSettingsMenu}
-        >
-          <Feather
-            name="more-vertical"
-            size={25} // Slightly larger icon
-            color={currentTheme.textPrimary}
-          />
-        </TouchableOpacity>
+        {isOwnProfile && (
+          <TouchableOpacity
+            style={styles.settingsIconContainer}
+            onPress={toggleSettingsMenu}
+          >
+            <Feather
+              name="more-vertical"
+              size={25} // Slightly larger icon
+              color={currentTheme.textPrimary}
+            />
+          </TouchableOpacity>
+        )}
 
         {/* --- Profile Header --- */}
         <View style={styles.profileHeader}>
-          <TouchableOpacity onPress={toggleModal} style={styles.avatarContainer}>
+          <TouchableOpacity
+            onPress={toggleModal}
+            style={styles.avatarContainer}
+          >
             <Image
               source={
                 profilePictureUri
@@ -235,35 +322,83 @@ const fetchUserAndCounts = async () => {
 
           {/* --- Edit Profile Button --- */}
           {(!userId || userId === auth.currentUser?.uid) && ( // Only show Edit button on own profile
-                <TouchableOpacity
-                  onPress={() => navigation.navigate("EditProfile")}
-                  style={[styles.editProfileButton, { backgroundColor: currentTheme.primary }]}
-                >
-                    <Feather name="edit-2" size={16} color={currentTheme.buttonText || '#ffffff'} style={{ marginRight: 8 }}/>
-                    <Text style={[styles.editProfileButtonText, { color: currentTheme.buttonText || '#ffffff' }]}>Edit Profile</Text>
-                </TouchableOpacity>
-           )}
+            <TouchableOpacity
+              onPress={() => navigation.navigate("EditProfile")}
+              style={[
+                styles.editProfileButton,
+                { backgroundColor: currentTheme.primary },
+              ]}
+            >
+              <Feather
+                name="edit-2"
+                size={16}
+                color={currentTheme.buttonText || "#ffffff"}
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                style={[
+                  styles.editProfileButtonText,
+                  { color: currentTheme.buttonText || "#ffffff" },
+                ]}
+              >
+                Edit Profile
+              </Text>
+            </TouchableOpacity>
+          )}
         </View>
 
         {/* --- Stats Section (Placeholder) --- */}
         {/* You'll need to fetch actual counts for these */}
-        <View style={[styles.statsContainer, styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
-            <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{postCount}</Text>
-            <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Posts</Text>
-            </View>
-            <View style={styles.statSeparator}></View>
-            <View style={styles.statItem}>
-            <Text style={[styles.statNumber, { color: currentTheme.textPrimary }]}>{savedEventsCount}</Text>
-            <Text style={[styles.statLabel, { color: currentTheme.textSecondary }]}>Events Saved</Text>
-            </View>
+        <View
+          style={[
+            styles.statsContainer,
+            styles.card,
+            { backgroundColor: cardBackgroundColor, shadowColor: shadowColor },
+          ]}
+        >
+          <View style={styles.statItem}>
+            <Text
+              style={[styles.statNumber, { color: currentTheme.textPrimary }]}
+            >
+              {postCount}
+            </Text>
+            <Text
+              style={[styles.statLabel, { color: currentTheme.textSecondary }]}
+            >
+              Posts
+            </Text>
+          </View>
+          <View style={styles.statSeparator}></View>
+          <View style={styles.statItem}>
+            <Text
+              style={[styles.statNumber, { color: currentTheme.textPrimary }]}
+            >
+              {savedEventsCount}
+            </Text>
+            <Text
+              style={[styles.statLabel, { color: currentTheme.textSecondary }]}
+            >
+              Events Saved
+            </Text>
+          </View>
         </View>
 
-
         {/* --- Bio Section --- */}
-        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
-             <MaterialCommunityIcons name="information-outline" size={20} color={currentTheme.textPrimary} /> Bio
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cardBackgroundColor, shadowColor: shadowColor },
+          ]}
+        >
+          <Text
+            style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}
+          >
+            <MaterialCommunityIcons
+              name="information-outline"
+              size={20}
+              color={currentTheme.textPrimary}
+            />{" "}
+            Bio
           </Text>
           <Text style={[styles.bioText, { color: currentTheme.textSecondary }]}>
             {userBio}
@@ -271,12 +406,28 @@ const fetchUserAndCounts = async () => {
         </View>
 
         {/* --- Interests Section --- */}
-        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
-             <MaterialCommunityIcons name="heart-multiple-outline" size={20} color={currentTheme.textPrimary} /> Interests
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: cardBackgroundColor, shadowColor: shadowColor },
+          ]}
+        >
+          <Text
+            style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}
+          >
+            <MaterialCommunityIcons
+              name="heart-multiple-outline"
+              size={20}
+              color={currentTheme.textPrimary}
+            />{" "}
+            Interests
           </Text>
           {userInterests.length > 0 ? (
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalScroll}
+            >
               {userInterests.map((interest: string) => (
                 <View
                   key={interest}
@@ -284,37 +435,64 @@ const fetchUserAndCounts = async () => {
                     styles.interestChip,
                     {
                       backgroundColor: chipBackgroundColor,
-                      borderColor: currentTheme.primary + '50', // Use primary color with opacity for border
+                      borderColor: currentTheme.primary + "50", // Use primary color with opacity for border
                     },
                   ]}
                 >
-                  <Text style={[styles.interestChipText, { color: chipTextColor }]}>
+                  <Text
+                    style={[styles.interestChipText, { color: chipTextColor }]}
+                  >
                     {interest}
                   </Text>
                 </View>
               ))}
             </ScrollView>
           ) : (
-             <Text style={[styles.placeholderText, { color: currentTheme.textSecondary }]}>No interests added yet.</Text>
+            <Text
+              style={[
+                styles.placeholderText,
+                { color: currentTheme.textSecondary },
+              ]}
+            >
+              No interests added yet.
+            </Text>
           )}
         </View>
 
         {/* --- Saved Posts Section --- */}
-        <View style={[styles.card, { backgroundColor: cardBackgroundColor, shadowColor: shadowColor }]}>
-          <Text style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}>
-            <MaterialCommunityIcons name="bookmark-multiple-outline" size={20} color={currentTheme.textPrimary} /> Saved Events
-          </Text>
-          <TouchableOpacity onPress={() => navigation.navigate("SavedEvents")}>
-            <Text style={[styles.linkText, { color: currentTheme.primary }]}>
-              View your saved events
+        {isOwnProfile && (
+          <View
+            style={[
+              styles.card,
+              {
+                backgroundColor: cardBackgroundColor,
+                shadowColor: shadowColor,
+              },
+            ]}
+          >
+            <Text
+              style={[styles.sectionTitle, { color: currentTheme.textPrimary }]}
+            >
+              <MaterialCommunityIcons
+                name="bookmark-multiple-outline"
+                size={20}
+                color={currentTheme.textPrimary}
+              />{" "}
+              Saved Events
             </Text>
-          </TouchableOpacity>
-           {/* Optional: Add a small preview of saved events here if feasible */}
-        </View>
+            <TouchableOpacity
+              onPress={() => navigation.navigate("SavedEvents")}
+            >
+              <Text style={[styles.linkText, { color: currentTheme.primary }]}>
+                View your saved events
+              </Text>
+            </TouchableOpacity>
+            {/* Optional: Add a small preview of saved events here if feasible */}
+          </View>
+        )}
 
         {/* Add some bottom padding to the scroll view */}
-         <View style={{ height: 30 }} />
-
+        <View style={{ height: 30 }} />
       </ScrollView>
 
       {/* --- Full Image Modal --- */}
@@ -351,44 +529,68 @@ const fetchUserAndCounts = async () => {
           style={styles.settingsMenuOverlay}
           onPress={toggleSettingsMenu}
         >
-          <Pressable onPress={() => {}} // Prevent closing when tapping inside menu
-             style={[
-               styles.settingsMenuContainer,
-               {
-                 backgroundColor: cardBackgroundColor,
-                 borderColor: currentTheme.inputBorder || '#ddd',
-                 shadowColor: shadowColor
-               },
-             ]}
-           >
-             {/* Settings Item */}
-             <TouchableOpacity
-               style={styles.settingsMenuItem}
-               onPress={navigateToSettings}
-             >
-               <Feather
-                 name="settings"
-                 size={18}
-                 color={currentTheme.textSecondary}
-                 style={styles.settingsMenuIcon}
-               />
-               <Text
-                 style={[
-                   styles.settingsMenuItemText,
-                   { color: currentTheme.textPrimary },
-                 ]}
-               >
-                 Settings
-               </Text>
-             </TouchableOpacity>
+          <Pressable
+            onPress={() => {}} // Prevent closing when tapping inside menu
+            style={[
+              styles.settingsMenuContainer,
+              {
+                backgroundColor: cardBackgroundColor,
+                borderColor: currentTheme.inputBorder || "#ddd",
+                shadowColor: shadowColor,
+              },
+            ]}
+          >
+            {/* Settings Item */}
+            <TouchableOpacity
+              style={styles.settingsMenuItem}
+              onPress={navigateToSettings}
+            >
+              <Feather
+                name="settings"
+                size={18}
+                color={currentTheme.textSecondary}
+                style={styles.settingsMenuIcon}
+              />
+              <Text
+                style={[
+                  styles.settingsMenuItemText,
+                  { color: currentTheme.textPrimary },
+                ]}
+              >
+                Settings
+              </Text>
+            </TouchableOpacity>
 
-             {/* Add other menu items here if needed */}
-             {/* Example: Logout (ensure handleLogout is defined) */}
-             <View style={[styles.menuSeparator, {backgroundColor: currentTheme.inputBorder}]} />
-              <TouchableOpacity style={styles.settingsMenuItem} onPress={() => { toggleSettingsMenu(); handleLogout(); }}>
-                  <Feather name="log-out" size={18} color={currentTheme.error || 'red'} style={styles.settingsMenuIcon} />
-                  <Text style={[styles.settingsMenuItemText, { color: currentTheme.error || 'red' }]}>Logout</Text>
-              </TouchableOpacity>
+            {/* Add other menu items here if needed */}
+            {/* Example: Logout (ensure handleLogout is defined) */}
+            <View
+              style={[
+                styles.menuSeparator,
+                { backgroundColor: currentTheme.inputBorder },
+              ]}
+            />
+            <TouchableOpacity
+              style={styles.settingsMenuItem}
+              onPress={() => {
+                toggleSettingsMenu();
+                handleLogout();
+              }}
+            >
+              <Feather
+                name="log-out"
+                size={18}
+                color={currentTheme.error || "red"}
+                style={styles.settingsMenuIcon}
+              />
+              <Text
+                style={[
+                  styles.settingsMenuItemText,
+                  { color: currentTheme.error || "red" },
+                ]}
+              >
+                Logout
+              </Text>
+            </TouchableOpacity>
           </Pressable>
         </Pressable>
       </Modal>
@@ -406,13 +608,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16, // Consistent horizontal padding
     paddingTop: 10, // Adjust as needed
   },
-  center: { // Loading indicator style
+  center: {
+    // Loading indicator style
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
   },
   settingsIconContainer: {
-    position: 'absolute', // Position top right
+    position: "absolute", // Position top right
     top: 10,
     right: 16, // Match horizontal padding
     padding: 8,
@@ -422,7 +625,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 10, // Space below settings icon
     marginBottom: 20,
-    width: '100%',
+    width: "100%",
   },
   avatarContainer: {
     marginBottom: 5,
@@ -445,18 +648,18 @@ const styles = StyleSheet.create({
     fontSize: 26, // Larger username
     fontWeight: "bold",
     marginTop: 10,
-    textAlign: 'center',
+    textAlign: "center",
   },
   email: {
     fontSize: 16,
     marginTop: 5,
     marginBottom: 15,
-    textAlign: 'center',
+    textAlign: "center",
   },
   editProfileButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     paddingVertical: 10,
     paddingHorizontal: 25,
     borderRadius: 25, // Rounded button
@@ -473,27 +676,27 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
   },
   statsContainer: {
-      flexDirection: 'row',
-      justifyContent: 'space-around',
-      width: '100%',
-      paddingVertical: 15, // Add vertical padding inside the card
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    paddingVertical: 15, // Add vertical padding inside the card
   },
   statItem: {
-      alignItems: 'center',
+    alignItems: "center",
   },
   statNumber: {
-      fontSize: 20,
-      fontWeight: 'bold',
+    fontSize: 20,
+    fontWeight: "bold",
   },
   statLabel: {
-      fontSize: 14,
-      marginTop: 4,
+    fontSize: 14,
+    marginTop: 4,
   },
   statSeparator: {
-      width: 1,
-      height: '60%', // Adjust height as needed
-      backgroundColor: '#e0e0e0', // Light separator color
-      alignSelf: 'center',
+    width: 1,
+    height: "60%", // Adjust height as needed
+    backgroundColor: "#e0e0e0", // Light separator color
+    alignSelf: "center",
   },
   // Reusable Card Style
   card: {
@@ -511,8 +714,8 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "600",
     marginBottom: 12, // Increased space below title
-    flexDirection: 'row', // Align icon and text
-    alignItems: 'center',
+    flexDirection: "row", // Align icon and text
+    alignItems: "center",
   },
   bioText: {
     fontSize: 15,
@@ -532,9 +735,9 @@ const styles = StyleSheet.create({
   },
   interestChipText: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: "500",
   },
-   placeholderText: {
+  placeholderText: {
     fontSize: 15,
     // fontStyle: 'italic',
     // textAlign: 'center',
@@ -542,7 +745,7 @@ const styles = StyleSheet.create({
   },
   linkText: {
     fontSize: 16,
-    fontWeight: '600',
+    fontWeight: "600",
     marginTop: 8, // Space above the link
   },
 
@@ -553,21 +756,21 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-//   modalContent: { // Not strictly needed if image takes full space
-//     width: "90%",
-//     height: "80%", // Adjust size as needed
-//     borderRadius: 15,
-//     overflow: "hidden",
-//     alignItems: 'center',
-//     justifyContent: 'center'
-//   },
+  //   modalContent: { // Not strictly needed if image takes full space
+  //     width: "90%",
+  //     height: "80%", // Adjust size as needed
+  //     borderRadius: 15,
+  //     overflow: "hidden",
+  //     alignItems: 'center',
+  //     justifyContent: 'center'
+  //   },
   fullImage: {
-    width: '95%', // Leave some margin
-    height: '85%', // Adjust as needed
+    width: "95%", // Leave some margin
+    height: "85%", // Adjust as needed
     borderRadius: 5, // Optional: slight rounding
   },
- closeButton: {
-    position: 'absolute',
+  closeButton: {
+    position: "absolute",
     top: 50, // Adjust positioning as needed
     right: 20,
     padding: 10,
@@ -582,7 +785,7 @@ const styles = StyleSheet.create({
     // Align menu to top-right (adjust based on icon position)
     // justifyContent: "flex-start",
     // alignItems: "flex-end",
-     // We use absolute positioning for the container instead
+    // We use absolute positioning for the container instead
   },
   settingsMenuContainer: {
     position: "absolute",
@@ -597,7 +800,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 5,
-    overflow: 'hidden', // Clip content to rounded corners
+    overflow: "hidden", // Clip content to rounded corners
   },
   settingsMenuItem: {
     flexDirection: "row",
@@ -610,7 +813,7 @@ const styles = StyleSheet.create({
   },
   settingsMenuItemText: {
     fontSize: 16,
-    fontWeight: '500', // Slightly bolder text
+    fontWeight: "500", // Slightly bolder text
   },
   menuSeparator: {
     height: StyleSheet.hairlineWidth,
