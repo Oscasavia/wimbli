@@ -26,6 +26,7 @@ import SavedEventsScreen from "./screens/SavedEventsScreen";
 import HelpAndSupportScreen from "./screens/HelpAndSupportScreen";
 import AboutAppScreen from "./screens/AboutAppScreen";
 import ChangePasswordScreen from "./screens/ChangePasswordScreen";
+import ProfileScreen from "./screens/ProfileScreen";
 import Chat from "./screens/Chat";
 
 const Stack = createNativeStackNavigator();
@@ -83,6 +84,7 @@ export default function App() {
             <Stack.Screen name="Main" component={AppTabs} />
             <Stack.Screen name="Chat" component={Chat} />
             <Stack.Screen name="Interests" component={InterestsScreen} />
+            <Stack.Screen name="Profile" component={ProfileScreen} />
             <Stack.Screen name="EditProfile" component={EditProfileScreen} />
             <Stack.Screen name="EditPost" component={PostScreen} />
             <Stack.Screen name="FullImage" component={FullImageScreen} />

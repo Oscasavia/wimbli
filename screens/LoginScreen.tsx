@@ -320,8 +320,8 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically
   },
   logoImage: {
-    width: 90, // Adjust size as needed
-    height: 90,
+    width: 100, // Adjust size as needed
+    height: 100,
     resizeMode: "contain",
   },
   appName: {

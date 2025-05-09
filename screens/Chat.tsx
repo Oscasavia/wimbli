@@ -57,37 +57,36 @@ interface Message {
 // formatTimestamp Function (remains the same)
 // ... formatTimestamp code ...
 const formatTimestamp = (timestamp: Timestamp | null | undefined) => {
-    if (!timestamp) return "";
-    let date: Date;
-    try {
-        date = timestamp.toDate();
-        if (isNaN(date.getTime())) return ""; // Invalid date
-    } catch (e) {
-        console.error("Error converting timestamp:", e);
-        return "";
-    }
+  if (!timestamp) return "";
+  let date: Date;
+  try {
+    date = timestamp.toDate();
+    if (isNaN(date.getTime())) return ""; // Invalid date
+  } catch (e) {
+    console.error("Error converting timestamp:", e);
+    return "";
+  }
 
-    const now = new Date();
-    const isToday = date.toDateString() === now.toDateString();
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
 
-    return isToday
-        ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
-        : date.toLocaleDateString([], { month: "short", day: "numeric" });
+  return isToday
+    ? date.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+    : date.toLocaleDateString([], { month: "short", day: "numeric" });
 };
 
 // getInitials Function (remains the same)
 // ... getInitials code ...
 const getInitials = (name: string | undefined): string => {
-    if (!name) return "?";
-    return name
-        .split(" ")
-        .map((n) => n[0])
-        .filter((char) => char && char.match(/[a-zA-Z]/))
-        .join("")
-        .toUpperCase()
-        .slice(0, 2);
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((n) => n[0])
+    .filter((char) => char && char.match(/[a-zA-Z]/))
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
 };
-
 
 export default function Chat() {
   const route = useRoute<any>();
@@ -106,7 +105,9 @@ export default function Chat() {
   const lastTapTimeRef = useRef(0);
   const [groupCreatorId, setGroupCreatorId] = useState<string | null>(null);
   const [isProcessingGroupAction, setIsProcessingGroupAction] = useState(false);
-  const [groupTitle, setGroupTitle] = useState(initialGroupName || "Group Chat");
+  const [groupTitle, setGroupTitle] = useState(
+    initialGroupName || "Group Chat"
+  );
   const [isSendingMessage, setIsSendingMessage] = useState(false); // <-- NEW State for sending indicator
 
   // --- Theme variable fallbacks (remain the same) ---
@@ -140,63 +141,63 @@ export default function Chat() {
   useEffect(() => {
     // ... fetchGroupData logic ...
     const fetchGroupData = async () => {
-        if (!groupId) {
-            console.error("ChatScreen: groupId is missing!");
-            Alert.alert("Error", "Cannot load chat, group ID is missing.");
-            if (navigation.canGoBack()) navigation.goBack();
-            return;
-        }
-        try {
-            const groupRef = doc(db, "groups", groupId);
-            const groupSnap = await getDoc(groupRef);
-            let title = initialGroupName || "Group Chat";
-            let fetchedCreatorId: string | null = null;
+      if (!groupId) {
+        console.error("ChatScreen: groupId is missing!");
+        Alert.alert("Error", "Cannot load chat, group ID is missing.");
+        if (navigation.canGoBack()) navigation.goBack();
+        return;
+      }
+      try {
+        const groupRef = doc(db, "groups", groupId);
+        const groupSnap = await getDoc(groupRef);
+        let title = initialGroupName || "Group Chat";
+        let fetchedCreatorId: string | null = null;
 
-            if (groupSnap.exists()) {
-                const data = groupSnap.data();
-                title = data.title || title;
-                setGroupTitle(title);
-                fetchedCreatorId = data.createdBy || null; // Get creator ID
-                setGroupCreatorId(fetchedCreatorId);
-            } else {
-                console.warn(
-                    `ChatScreen: Group document ${groupId} may have been deleted.`
-                );
-                Alert.alert("Group Not Found", "This group may have been deleted.");
-                if (navigation.canGoBack()) navigation.goBack();
-                return;
+        if (groupSnap.exists()) {
+          const data = groupSnap.data();
+          title = data.title || title;
+          setGroupTitle(title);
+          fetchedCreatorId = data.createdBy || null; // Get creator ID
+          setGroupCreatorId(fetchedCreatorId);
+        } else {
+          console.warn(
+            `ChatScreen: Group document ${groupId} may have been deleted.`
+          );
+          Alert.alert("Group Not Found", "This group may have been deleted.");
+          if (navigation.canGoBack()) navigation.goBack();
+          return;
+        }
+
+        navigation.setOptions({
+          title: title,
+          // headerRight setup remains the same
+          headerRight: () => {
+            const currentUserId = auth.currentUser?.uid;
+            if (fetchedCreatorId && currentUserId) {
+              return (
+                <TouchableOpacity
+                  onPress={showGroupOptions}
+                  style={{ paddingHorizontal: 6 }} // Adjusted style slightly
+                >
+                  <Feather
+                    name="more-vertical"
+                    size={22}
+                    color={currentTheme.textPrimary}
+                  />
+                </TouchableOpacity>
+              );
             }
-
-            navigation.setOptions({
-                title: title,
-                // headerRight setup remains the same
-                 headerRight: () => {
-                 const currentUserId = auth.currentUser?.uid;
-                 if (fetchedCreatorId && currentUserId) {
-                   return (
-                     <TouchableOpacity
-                       onPress={showGroupOptions}
-                       style={{ paddingHorizontal: 6 }} // Adjusted style slightly
-                     >
-                       <Feather
-                         name="more-vertical"
-                         size={22}
-                         color={currentTheme.textPrimary}
-                       />
-                     </TouchableOpacity>
-                   );
-                 }
-                 return null;
-               },
-            });
-        } catch (error) {
-            console.error("Error fetching group data:", error);
-            Alert.alert("Error", "Could not load group details.");
-            navigation.setOptions({
-                title: initialGroupName || "Group Chat",
-                headerRight: () => null,
-            });
-        }
+            return null;
+          },
+        });
+      } catch (error) {
+        console.error("Error fetching group data:", error);
+        Alert.alert("Error", "Could not load group details.");
+        navigation.setOptions({
+          title: initialGroupName || "Group Chat",
+          headerRight: () => null,
+        });
+      }
     };
     fetchGroupData();
   }, [groupId, navigation, initialGroupName, currentTheme.textPrimary]); // Adjusted dependencies
@@ -206,57 +207,57 @@ export default function Chat() {
     // ... existing message fetching logic using onSnapshot ...
     // The senderName/senderAvatar fetching fallback might become less necessary
     // if the Cloud Function always denormalizes it correctly.
-     if (!groupId) return;
-     setLoadingMessages(true);
-     const messagesRef = collection(db, "groups", groupId, "messages");
-     const q = query(messagesRef, orderBy("timestamp", "asc"));
+    if (!groupId) return;
+    setLoadingMessages(true);
+    const messagesRef = collection(db, "groups", groupId, "messages");
+    const q = query(messagesRef, orderBy("timestamp", "asc"));
 
-     const unsubscribe = onSnapshot(
-       q,
-       async (snapshot) => {
-         console.log(
-           `Chat snapshot received. Size: ${snapshot.size}, Changes: ${snapshot.docChanges().length}`
-         );
-         // Now relies on senderName/senderAvatar being written by the Cloud Function
-         const msgs = snapshot.docs.map((docSnap): Message => {
-           const data = docSnap.data();
-           return {
-             id: docSnap.id,
-             text: data.text || "",
-             senderId: data.senderId || "",
-             timestamp: data.timestamp || Timestamp.now(),
-             replyToMessageText: data.replyToMessageText,
-             replyToSenderName: data.replyToSenderName,
-             likedBy: data.likedBy || [],
-             senderName: data.senderName || "Unknown", // Default if CF somehow missed it
-             senderAvatar: data.senderAvatar || null, // Default if CF somehow missed it
-           };
-         });
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        console.log(
+          `Chat snapshot received. Size: ${snapshot.size}, Changes: ${snapshot.docChanges().length}`
+        );
+        // Now relies on senderName/senderAvatar being written by the Cloud Function
+        const msgs = snapshot.docs.map((docSnap): Message => {
+          const data = docSnap.data();
+          return {
+            id: docSnap.id,
+            text: data.text || "",
+            senderId: data.senderId || "",
+            timestamp: data.timestamp || Timestamp.now(),
+            replyToMessageText: data.replyToMessageText,
+            replyToSenderName: data.replyToSenderName,
+            likedBy: data.likedBy || [],
+            senderName: data.senderName || "Unknown", // Default if CF somehow missed it
+            senderAvatar: data.senderAvatar || null, // Default if CF somehow missed it
+          };
+        });
 
-         setMessages(msgs);
-         setLoadingMessages(false);
+        setMessages(msgs);
+        setLoadingMessages(false);
 
-         setTimeout(() => {
-           flatListRef.current?.scrollToEnd({ animated: true });
-         }, 100);
-       },
-       (error) => {
-         console.error("Error fetching messages:", error);
-         Alert.alert("Error", "Could not load messages.");
-         setLoadingMessages(false);
-       }
-     );
+        setTimeout(() => {
+          flatListRef.current?.scrollToEnd({ animated: true });
+        }, 100);
+      },
+      (error) => {
+        console.error("Error fetching messages:", error);
+        Alert.alert("Error", "Could not load messages.");
+        setLoadingMessages(false);
+      }
+    );
 
-     // Cleanup function (remains the same)
-     return () => {
-       console.log(
-         "ChatScreen exiting. Unsubscribing messages listener and updating lastSeen."
-       );
-       unsubscribe();
-       AsyncStorage.setItem(`lastSeen_${groupId}`, new Date().toISOString())
-         .then(() => console.log(`Updated lastSeen_${groupId} on exit.`))
-         .catch((err) => console.error("Error setting lastSeen on exit:", err));
-     };
+    // Cleanup function (remains the same)
+    return () => {
+      console.log(
+        "ChatScreen exiting. Unsubscribing messages listener and updating lastSeen."
+      );
+      unsubscribe();
+      AsyncStorage.setItem(`lastSeen_${groupId}`, new Date().toISOString())
+        .then(() => console.log(`Updated lastSeen_${groupId} on exit.`))
+        .catch((err) => console.error("Error setting lastSeen on exit:", err));
+    };
   }, [groupId]);
 
   // --- Actions (like, group options, leave/delete group, delete message - remain the same) ---
@@ -265,210 +266,210 @@ export default function Chat() {
     const now = Date.now();
     const DOUBLE_PRESS_DELAY = 300; // ms
     if (now - lastTapTimeRef.current < DOUBLE_PRESS_DELAY) {
-        likeMessage(messageId, currentLikes);
+      likeMessage(messageId, currentLikes);
     }
     lastTapTimeRef.current = now;
   };
   // ... showGroupOptions ...
-    const showGroupOptions = () => {
-        const currentUser = auth.currentUser;
-        if (!currentUser || groupCreatorId === null) {
-            Alert.alert(
-                "Error",
-                "Cannot perform action. User or group info unavailable."
-            );
-            return;
-        }
+  const showGroupOptions = () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || groupCreatorId === null) {
+      Alert.alert(
+        "Error",
+        "Cannot perform action. User or group info unavailable."
+      );
+      return;
+    }
 
-        const options: AlertButton[] = [];
+    const options: AlertButton[] = [];
 
-        if (currentUser.uid === groupCreatorId) {
-            options.push({
-                text: "Delete Group",
-                onPress: handleDeleteGroup,
-                style: "destructive",
-            });
-        } else {
-            options.push({
-                text: "Leave Group",
-                onPress: handleLeaveGroup,
-                style: "destructive",
-            });
-        }
+    if (currentUser.uid === groupCreatorId) {
+      options.push({
+        text: "Delete Group",
+        onPress: handleDeleteGroup,
+        style: "destructive",
+      });
+    } else {
+      options.push({
+        text: "Leave Group",
+        onPress: handleLeaveGroup,
+        style: "destructive",
+      });
+    }
 
-        options.push({ text: "Cancel", style: "cancel" });
+    options.push({ text: "Cancel", style: "cancel" });
 
-        Alert.alert("Group Options", "Choose an action for this group.", options, {
-            cancelable: true,
-        });
-    };
+    Alert.alert("Group Options", "Choose an action for this group.", options, {
+      cancelable: true,
+    });
+  };
   // ... handleLeaveGroup ...
-    const handleLeaveGroup = async () => {
-        const currentUser = auth.currentUser;
-        if (!currentUser || !groupId) {
-            Alert.alert("Error", "Could not identify user or group.");
-            return;
-        }
-        const userId = currentUser.uid;
+  const handleLeaveGroup = async () => {
+    const currentUser = auth.currentUser;
+    if (!currentUser || !groupId) {
+      Alert.alert("Error", "Could not identify user or group.");
+      return;
+    }
+    const userId = currentUser.uid;
 
-        Alert.alert("Leave Group", "Are you sure you want to leave this group?", [
-            { text: "Cancel", style: "cancel" },
-            {
-                text: "Leave",
-                style: "destructive",
-                onPress: async () => {
-                    setIsProcessingGroupAction(true);
-                    const groupRef = doc(db, "groups", groupId);
-                    try {
-                        await updateDoc(groupRef, { members: arrayRemove(userId) });
-                        await AsyncStorage.removeItem(`lastSeen_${groupId}`);
-                        Alert.alert("Success", "You have left the group.");
-                        if (navigation.canGoBack()) navigation.goBack();
-                        else navigation.navigate("Messages");
-                    } catch (error: any) {
-                        console.error("Error leaving group:", error);
-                        Alert.alert("Error", `Could not leave the group: ${error.message}`);
-                    } finally {
-                        setIsProcessingGroupAction(false);
-                    }
-                },
-            },
-        ]);
-    };
+    Alert.alert("Leave Group", "Are you sure you want to leave this group?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Leave",
+        style: "destructive",
+        onPress: async () => {
+          setIsProcessingGroupAction(true);
+          const groupRef = doc(db, "groups", groupId);
+          try {
+            await updateDoc(groupRef, { members: arrayRemove(userId) });
+            await AsyncStorage.removeItem(`lastSeen_${groupId}`);
+            Alert.alert("Success", "You have left the group.");
+            if (navigation.canGoBack()) navigation.goBack();
+            else navigation.navigate("Messages");
+          } catch (error: any) {
+            console.error("Error leaving group:", error);
+            Alert.alert("Error", `Could not leave the group: ${error.message}`);
+          } finally {
+            setIsProcessingGroupAction(false);
+          }
+        },
+      },
+    ]);
+  };
   // ... handleDeleteGroup ...
-    const handleDeleteGroup = () => {
-        if (!groupId) {
-            Alert.alert("Error", "Group ID is missing.");
-            return;
-        }
-        Alert.alert(
-            "Delete Group Permanently",
-            "This will delete the group and ALL messages for everyone. This action cannot be undone.",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete Permanently",
-                    style: "destructive",
-                    onPress: async () => {
-                        setIsProcessingGroupAction(true);
-                        try {
-                            console.log(
-                                `Calling deleteGroupChat Cloud Function for group ${groupId}`
-                            );
-                            const result = await callDeleteGroupChat({ groupId: groupId });
-                            console.log("Cloud function result:", result.data);
-                            Alert.alert("Success", "Group deletion initiated.");
-                            if (navigation.canGoBack()) navigation.goBack();
-                            else navigation.navigate("Messages");
-                        } catch (error: any) {
-                            console.error("Error calling deleteGroupChat function:", error);
-                            const message = error.message || "An unknown error occurred.";
-                            Alert.alert("Error", `Failed to delete group: ${message}`);
-                        } finally {
-                            setIsProcessingGroupAction(false);
-                        }
-                    },
-                },
-            ]
-        );
-    };
+  const handleDeleteGroup = () => {
+    if (!groupId) {
+      Alert.alert("Error", "Group ID is missing.");
+      return;
+    }
+    Alert.alert(
+      "Delete Group Permanently",
+      "This will delete the group and ALL messages for everyone. This action cannot be undone.",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete Permanently",
+          style: "destructive",
+          onPress: async () => {
+            setIsProcessingGroupAction(true);
+            try {
+              console.log(
+                `Calling deleteGroupChat Cloud Function for group ${groupId}`
+              );
+              const result = await callDeleteGroupChat({ groupId: groupId });
+              console.log("Cloud function result:", result.data);
+              Alert.alert("Success", "Group deletion initiated.");
+              if (navigation.canGoBack()) navigation.goBack();
+              else navigation.navigate("Messages");
+            } catch (error: any) {
+              console.error("Error calling deleteGroupChat function:", error);
+              const message = error.message || "An unknown error occurred.";
+              Alert.alert("Error", `Failed to delete group: ${message}`);
+            } finally {
+              setIsProcessingGroupAction(false);
+            }
+          },
+        },
+      ]
+    );
+  };
   // ... likeMessage ...
-    const likeMessage = async (
-        messageId: string,
-        currentLikes: string[] = []
-    ) => {
-        const userId = auth.currentUser?.uid;
-        if (!userId || !groupId) return; // Added groupId check for safety
+  const likeMessage = async (
+    messageId: string,
+    currentLikes: string[] = []
+  ) => {
+    const userId = auth.currentUser?.uid;
+    if (!userId || !groupId) return; // Added groupId check for safety
 
-        const messageRef = doc(db, "groups", groupId, "messages", messageId);
-        const isLiked = currentLikes.includes(userId);
+    const messageRef = doc(db, "groups", groupId, "messages", messageId);
+    const isLiked = currentLikes.includes(userId);
 
-        const updatedLikes = isLiked
-            ? currentLikes.filter((uid) => uid !== userId) // Unlike
-            : [...currentLikes, userId]; // Like
+    const updatedLikes = isLiked
+      ? currentLikes.filter((uid) => uid !== userId) // Unlike
+      : [...currentLikes, userId]; // Like
 
-        try {
-            await updateDoc(messageRef, { likedBy: updatedLikes });
-        } catch (error) {
-            console.error("Error updating likes:", error);
-            Alert.alert("Error", "Could not update like status.");
-        }
-    };
+    try {
+      await updateDoc(messageRef, { likedBy: updatedLikes });
+    } catch (error) {
+      console.error("Error updating likes:", error);
+      Alert.alert("Error", "Could not update like status.");
+    }
+  };
   // ... handleDeleteMessage ...
-    const handleDeleteMessage = async (messageToDelete: Message) => {
-        const currentUserID = auth.currentUser?.uid;
-        if (!currentUserID || !groupId) return;
+  const handleDeleteMessage = async (messageToDelete: Message) => {
+    const currentUserID = auth.currentUser?.uid;
+    if (!currentUserID || !groupId) return;
 
-        if (messageToDelete.senderId !== currentUserID) {
-             Alert.alert("Access Denied", "You can only delete your own messages.");
-             return;
-        }
+    if (messageToDelete.senderId !== currentUserID) {
+      Alert.alert("Access Denied", "You can only delete your own messages.");
+      return;
+    }
 
-        const messageRef = doc(
-            db,
-            "groups",
-            groupId,
-            "messages",
-            messageToDelete.id
-        );
+    const messageRef = doc(
+      db,
+      "groups",
+      groupId,
+      "messages",
+      messageToDelete.id
+    );
 
-        Alert.alert(
-            "Delete Message",
-            "Are you sure you want to permanently delete this message?",
-            [
-                { text: "Cancel", style: "cancel" },
-                {
-                    text: "Delete",
-                    onPress: async () => {
-                        try {
-                             await deleteDoc(messageRef);
-                             console.log("Message deleted successfully:", messageToDelete.id);
+    Alert.alert(
+      "Delete Message",
+      "Are you sure you want to permanently delete this message?",
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Delete",
+          onPress: async () => {
+            try {
+              await deleteDoc(messageRef);
+              console.log("Message deleted successfully:", messageToDelete.id);
 
-                             // Update group's last message if this was the last one
-                             const groupDocRef = doc(db, "groups", groupId);
-                             const groupDocSnap = await getDoc(groupDocRef);
+              // Update group's last message if this was the last one
+              const groupDocRef = doc(db, "groups", groupId);
+              const groupDocSnap = await getDoc(groupDocRef);
 
-                             if (groupDocSnap.exists()) {
-                                 const groupData = groupDocSnap.data();
-                                 if (groupData.lastMessageId === messageToDelete.id) {
-                                     const messagesQuery = query(
-                                         collection(db, "groups", groupId, "messages"),
-                                         orderBy("timestamp", "desc"),
-                                         limit(1)
-                                     );
-                                     const newLastMessagesSnap = await getDocs(messagesQuery);
-                                     let updateData:any = {};
-                                     if (!newLastMessagesSnap.empty) {
-                                         const newLastMessageDoc = newLastMessagesSnap.docs[0];
-                                         const newLastMessageData = newLastMessageDoc.data();
-                                         updateData = {
-                                             lastMessage: newLastMessageData.text,
-                                             lastUpdated: newLastMessageData.timestamp,
-                                             lastMessageId: newLastMessageDoc.id,
-                                             lastMessageSenderId: newLastMessageData.senderId, // Added sender ID update
-                                         };
-                                     } else {
-                                         updateData = {
-                                             lastMessage: "No messages yet.",
-                                             lastUpdated: Timestamp.now(),
-                                             lastMessageId: null,
-                                             lastMessageSenderId: null, // Clear sender ID
-                                         };
-                                     }
-                                     await updateDoc(groupDocRef, updateData);
-                                 }
-                             }
-                         } catch (error) {
-                             console.error("Error deleting message or updating group:", error);
-                             Alert.alert("Error", "Could not delete the message.");
-                         }
-                    },
-                    style: "destructive",
-                },
-            ],
-            { cancelable: true }
-        );
-    };
+              if (groupDocSnap.exists()) {
+                const groupData = groupDocSnap.data();
+                if (groupData.lastMessageId === messageToDelete.id) {
+                  const messagesQuery = query(
+                    collection(db, "groups", groupId, "messages"),
+                    orderBy("timestamp", "desc"),
+                    limit(1)
+                  );
+                  const newLastMessagesSnap = await getDocs(messagesQuery);
+                  let updateData: any = {};
+                  if (!newLastMessagesSnap.empty) {
+                    const newLastMessageDoc = newLastMessagesSnap.docs[0];
+                    const newLastMessageData = newLastMessageDoc.data();
+                    updateData = {
+                      lastMessage: newLastMessageData.text,
+                      lastUpdated: newLastMessageData.timestamp,
+                      lastMessageId: newLastMessageDoc.id,
+                      lastMessageSenderId: newLastMessageData.senderId, // Added sender ID update
+                    };
+                  } else {
+                    updateData = {
+                      lastMessage: "No messages yet.",
+                      lastUpdated: Timestamp.now(),
+                      lastMessageId: null,
+                      lastMessageSenderId: null, // Clear sender ID
+                    };
+                  }
+                  await updateDoc(groupDocRef, updateData);
+                }
+              }
+            } catch (error) {
+              console.error("Error deleting message or updating group:", error);
+              Alert.alert("Error", "Could not delete the message.");
+            }
+          },
+          style: "destructive",
+        },
+      ],
+      { cancelable: true }
+    );
+  };
 
   // --- MODIFIED: sendMessage Function ---
   const sendMessage = async () => {
@@ -476,8 +477,12 @@ export default function Chat() {
     if (!trimmedInput || isSendingMessage) return; // Prevent sending empty or during send
 
     const currentUser = auth.currentUser;
-    if (!currentUser || !currentUser.uid || !groupId) { // Added groupId check
-      Alert.alert("Error", "You must be logged in and in a valid group to send messages.");
+    if (!currentUser || !currentUser.uid || !groupId) {
+      // Added groupId check
+      Alert.alert(
+        "Error",
+        "You must be logged in and in a valid group to send messages."
+      );
       return;
     }
 
@@ -500,7 +505,10 @@ export default function Chat() {
     setIsSendingMessage(true); // Start loading indicator
 
     try {
-      console.log("[Chat.tsx] Calling sendMessageWithModeration with payload:", messagePayload);
+      console.log(
+        "[Chat.tsx] Calling sendMessageWithModeration with payload:",
+        messagePayload
+      );
       // Call the Cloud Function
       const result = await callSendMessageWithModeration(messagePayload);
       console.log("[Chat.tsx] Cloud function result:", result.data);
@@ -508,11 +516,14 @@ export default function Chat() {
       // Success! The onSnapshot listener will automatically display the new message.
       // Optional: Scroll down explicitly if onSnapshot doesn't trigger scroll reliably
       // setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 150);
-
     } catch (error: any) {
-      console.error("[Chat.tsx] Error calling sendMessageWithModeration:", error);
+      console.error(
+        "[Chat.tsx] Error calling sendMessageWithModeration:",
+        error
+      );
       // Handle specific errors returned from the function (e.g., profanity block)
-      const errorMessage = error.message || "An unknown error occurred. Could not send message.";
+      const errorMessage =
+        error.message || "An unknown error occurred. Could not send message.";
       Alert.alert(
         "Message Not Sent",
         errorMessage // Display the error message from the CF
@@ -525,7 +536,6 @@ export default function Chat() {
     }
   };
 
-
   // --- Render Message Item (remains the same) ---
   const renderMessageItem = ({ item }: { item: Message }) => {
     // ... existing renderMessageItem logic ...
@@ -533,32 +543,32 @@ export default function Chat() {
     const isSender = item.senderId === auth.currentUser?.uid;
 
     const handleLongPress = () => {
-     const options: AlertButton[] = [
-       {
-         text: "Reply",
-         onPress: () => setReplyingTo(item),
-       },
-     ];
+      const options: AlertButton[] = [
+        {
+          text: "Reply",
+          onPress: () => setReplyingTo(item),
+        },
+      ];
 
-     if (isSender) {
-       options.push({
-         text: "Delete Message",
-         onPress: () => handleDeleteMessage(item),
-         style: "destructive",
-       });
-     }
+      if (isSender) {
+        options.push({
+          text: "Delete Message",
+          onPress: () => handleDeleteMessage(item),
+          style: "destructive",
+        });
+      }
 
-     options.push({
-       text: "Cancel",
-       style: "cancel",
-     });
+      options.push({
+        text: "Cancel",
+        style: "cancel",
+      });
 
-     Alert.alert(
-       "Message Options",
-       `"${item.text.substring(0, 50)}${item.text.length > 50 ? "..." : ""}"`,
-       options,
-       { cancelable: true }
-     );
+      Alert.alert(
+        "Message Options",
+        `"${item.text.substring(0, 50)}${item.text.length > 50 ? "..." : ""}"`,
+        options,
+        { cancelable: true }
+      );
     };
 
     return (
@@ -572,14 +582,22 @@ export default function Chat() {
         ]}
       >
         {!isSender && (
-          <Image
-            source={
-              item.senderAvatar
-                ? { uri: item.senderAvatar }
-                : require("../assets/default-profile.png")
-            }
-            style={styles.avatar}
-          />
+          <TouchableOpacity
+            onPress={() => {
+              if (item.senderId) {
+                navigation.navigate("Profile", { userId: item.senderId });
+              }
+            }}
+          >
+            <Image
+              source={
+                item.senderAvatar
+                  ? { uri: item.senderAvatar }
+                  : require("../assets/default-profile.png")
+              }
+              style={styles.avatar}
+            />
+          </TouchableOpacity>
         )}
         <View
           style={[
@@ -588,11 +606,22 @@ export default function Chat() {
           ]}
         >
           {!isSender && (
-            <Text
-              style={[styles.senderName, { color: currentTheme.textSecondary }]}
+            <TouchableOpacity
+              onPress={() => {
+                if (item.senderId) {
+                  navigation.navigate("Profile", { userId: item.senderId });
+                }
+              }}
             >
-              {item.senderName || "User"}
-            </Text>
+              <Text
+                style={[
+                  styles.senderName,
+                  { color: currentTheme.textSecondary },
+                ]}
+              >
+                {item.senderName || "User"}
+              </Text>
+            </TouchableOpacity>
           )}
           <View
             style={[
@@ -681,7 +710,6 @@ export default function Chat() {
     );
   };
 
-
   // --- Main Component Return ---
   return (
     <SafeAreaView
@@ -705,44 +733,55 @@ export default function Chat() {
           },
         ]}
       >
-          {/* Header content using groupTitle etc. */}
-           <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
-             <Text
-               numberOfLines={1}
-               style={[
-                 styles.screenTitle,
-                 {
-                   color: currentTheme.textPrimary,
-                   flex: 1,
-                   textAlign: "left", // Keep title aligned left
-                  //  fontSize: 20, // Font size already in style
-                 },
-               ]}
-             >
-               {groupTitle}
-             </Text>
-             {/* Keep the options button */}
-              {auth.currentUser?.uid && groupCreatorId && (
-               <TouchableOpacity
-                 onPress={showGroupOptions}
-                 style={{ paddingHorizontal: 6 }} // Tappable area
-               >
-                 <Feather
-                   name="more-vertical"
-                   size={22}
-                   color={currentTheme.textPrimary}
-                 />
-               </TouchableOpacity>
-             )}
-           </View>
+        {/* Header content using groupTitle etc. */}
+        <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          <Text
+            numberOfLines={1}
+            style={[
+              styles.screenTitle,
+              {
+                color: currentTheme.textPrimary,
+                flex: 1,
+                textAlign: "left", // Keep title aligned left
+                //  fontSize: 20, // Font size already in style
+              },
+            ]}
+          >
+            {groupTitle}
+          </Text>
+          {/* Keep the options button */}
+          {auth.currentUser?.uid && groupCreatorId && (
+            <TouchableOpacity
+              onPress={showGroupOptions}
+              style={{ paddingHorizontal: 6 }} // Tappable area
+            >
+              <Feather
+                name="more-vertical"
+                size={22}
+                color={currentTheme.textPrimary}
+              />
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
 
       {/* Loading overlay for group actions */}
       {isProcessingGroupAction && (
-         <View style={styles.actionOverlay}>
-           <ActivityIndicator size="large" color={currentTheme.primary || "blue"} />
-           <Text style={[ styles.actionOverlayText, { color: currentTheme.background || "#fff" }]}> Processing... </Text>
-         </View>
+        <View style={styles.actionOverlay}>
+          <ActivityIndicator
+            size="large"
+            color={currentTheme.primary || "blue"}
+          />
+          <Text
+            style={[
+              styles.actionOverlayText,
+              { color: currentTheme.background || "#fff" },
+            ]}
+          >
+            {" "}
+            Processing...{" "}
+          </Text>
+        </View>
       )}
 
       <KeyboardAvoidingView
@@ -778,19 +817,41 @@ export default function Chat() {
 
         {/* Reply Preview Area */}
         {replyingTo && (
-            <View style={[ styles.replyPreviewContainer, { backgroundColor: inputBackgroundColor, borderTopColor: inputBorderColor, } ]}>
-                <View style={styles.replyPreviewTextContainer}>
-                    <Text style={[ styles.replyPreviewLabel, { color: currentTheme.primary }, ]}>
-                        Replying to {replyingTo.senderName || "Unknown"}
-                    </Text>
-                    <Text style={[ styles.replyPreviewText, { color: currentTheme.textSecondary }, ]} numberOfLines={1} >
-                        {replyingTo.text}
-                    </Text>
-                </View>
-                <TouchableOpacity onPress={() => setReplyingTo(null)} style={styles.cancelReplyButton} >
-                    <Feather name="x" size={20} color={currentTheme.textSecondary} />
-                </TouchableOpacity>
+          <View
+            style={[
+              styles.replyPreviewContainer,
+              {
+                backgroundColor: inputBackgroundColor,
+                borderTopColor: inputBorderColor,
+              },
+            ]}
+          >
+            <View style={styles.replyPreviewTextContainer}>
+              <Text
+                style={[
+                  styles.replyPreviewLabel,
+                  { color: currentTheme.primary },
+                ]}
+              >
+                Replying to {replyingTo.senderName || "Unknown"}
+              </Text>
+              <Text
+                style={[
+                  styles.replyPreviewText,
+                  { color: currentTheme.textSecondary },
+                ]}
+                numberOfLines={1}
+              >
+                {replyingTo.text}
+              </Text>
             </View>
+            <TouchableOpacity
+              onPress={() => setReplyingTo(null)}
+              style={styles.cancelReplyButton}
+            >
+              <Feather name="x" size={20} color={currentTheme.textSecondary} />
+            </TouchableOpacity>
+          </View>
         )}
 
         {/* Input Area */}
@@ -822,16 +883,20 @@ export default function Chat() {
             style={[
               styles.sendButton,
               {
-                backgroundColor: input.trim() && !isSendingMessage // Dim if empty OR sending
-                  ? currentTheme.primary
-                  : currentTheme.textSecondary,
+                backgroundColor:
+                  input.trim() && !isSendingMessage // Dim if empty OR sending
+                    ? currentTheme.primary
+                    : currentTheme.textSecondary,
               },
             ]}
             onPress={sendMessage}
             disabled={!input.trim() || isSendingMessage} // Disable if empty OR sending
           >
             {isSendingMessage ? ( // Show activity indicator when sending
-              <ActivityIndicator size="small" color={currentTheme.buttonText || "#fff"} />
+              <ActivityIndicator
+                size="small"
+                color={currentTheme.buttonText || "#fff"}
+              />
             ) : (
               <Feather
                 name="send"
@@ -853,7 +918,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    flexDirection:"row",
+    flexDirection: "row",
     padding: 15,
     // backgroundColor: currentTheme.cardBackground,
     borderBottomWidth: 1,
@@ -911,10 +976,8 @@ const styles = StyleSheet.create({
   messageContentContainer: {
     maxWidth: "80%",
   },
-  senderMessageAlign: {
-  },
-  receiverMessageAlign: {
-  },
+  senderMessageAlign: {},
+  receiverMessageAlign: {},
   senderName: {
     fontSize: 12,
     marginBottom: 3,
@@ -956,8 +1019,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 5,
   },
-  likeContainer: {
-  },
+  likeContainer: {},
   likeText: {
     fontSize: 11,
     marginRight: 6,

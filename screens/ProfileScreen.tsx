@@ -276,7 +276,6 @@ export default function ProfileScreen() {
       style={[styles.safeArea, { backgroundColor: currentTheme.background }]}
     >
       <StatusBar
-        translucent={false}
         backgroundColor={currentTheme.background}
         barStyle={isDark ? "light-content" : "dark-content"}
       />
@@ -640,22 +639,22 @@ const styles = StyleSheet.create({
     borderRadius: 75, // Needs to match half of avatar size
   },
   avatar: {
-    width: 150, // Larger avatar
-    height: 150,
-    borderRadius: 75, // Half of width/height
+    width: 120, // Larger avatar
+    height: 120,
+    borderRadius: 60, // Half of width/height
     borderWidth: 3,
     borderColor: "#fff", // White border looks clean
   },
   username: {
-    fontSize: 26, // Larger username
+    fontSize: 24, // Larger username
     fontWeight: "bold",
     marginTop: 10,
-    textAlign: "center",
+    // textAlign: "center",
   },
   email: {
     fontSize: 16,
     marginTop: 5,
-    marginBottom: 15,
+    marginBottom: 10,
     textAlign: "center",
   },
   editProfileButton: {
@@ -710,7 +709,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 1,
   },
   sectionTitle: {
     fontSize: 18,
@@ -793,7 +792,7 @@ const styles = StyleSheet.create({
     position: "absolute",
     top: 50, // Adjust based on SafeAreaView and icon position
     right: 20,
-    width: 180, // Wider menu
+    width: 200, // Wider menu
     borderRadius: 10, // More rounded corners
     borderWidth: StyleSheet.hairlineWidth, // Thinner border
     // Background and border color set dynamically

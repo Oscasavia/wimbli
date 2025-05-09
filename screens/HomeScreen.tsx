@@ -825,12 +825,15 @@ export default function HomeScreen() {
             },
           ]}
         >
-          <Feather
+          <Text style={[styles.appName, { color: currentTheme.primary }]}>
+                      Wimbli
+                    </Text>
+          {/* <Feather
             name="search"
             size={20}
             color={placeholderTextColor}
             style={styles.searchIcon}
-          />
+          /> */}
           <TextInput
             style={[styles.searchInput, { color: currentTheme.textPrimary }]}
             placeholder="Search events..."
@@ -1493,9 +1496,15 @@ const styles = StyleSheet.create({
     height: 44, // Consistent height
     // Dynamic background and border color
   },
-  searchIcon: {
+  appName: {
+    fontSize: 15,
+    fontWeight: "bold",
     marginRight: 8,
+    // color set dynamically
   },
+  // searchIcon: {
+  //   marginRight: 8,
+  // },
   searchInput: {
     flex: 1,
     paddingVertical: 0, // Remove default padding if height is set

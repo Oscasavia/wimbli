@@ -356,7 +356,9 @@ export default function SignupScreen() {
                 <Text
                   style={[styles.linkHighlight, { color: linkColor }]}
                   onPress={() =>
-                    navigation.navigate("WebView", { url: "YOUR_TERMS_URL" })
+                    navigation.navigate("WebView", {
+                      url: "https://cerulean-biscotti-582837.netlify.app/",
+                    })
                   } // Replace with your actual URL
                 >
                   Terms
@@ -365,7 +367,9 @@ export default function SignupScreen() {
                 <Text
                   style={[styles.linkHighlight, { color: linkColor }]}
                   onPress={() =>
-                    navigation.navigate("WebView", { url: "YOUR_PRIVACY_URL" })
+                    navigation.navigate("WebView", {
+                      url: "https://lovely-unicorn-a7167c.netlify.app/",
+                    })
                   } // Replace with your actual URL
                 >
                   Privacy Policy
@@ -453,8 +457,8 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically
   },
   logoImage: {
-    width: 90,
-    height: 90,
+    width: 100,
+    height: 100,
     resizeMode: "contain",
   },
   appName: {
