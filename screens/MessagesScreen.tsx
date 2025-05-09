@@ -87,16 +87,17 @@ export default function MessagesScreen() {
           async (docSnap): Promise<Group | null> => {
             const data = docSnap.data();
             const groupId = docSnap.id;
-        
+
             // Client-side filter (keep or use server-side as noted)
             if (!data.members || !data.members.includes(userId)) {
               return null; // User not a member
             }
-        
+
             // Calculate unread status
             let isUnread = false;
-            const lastMessageWasByCurrentUser = data.lastMessageSenderId === userId; // <-- CHECK HERE
-        
+            const lastMessageWasByCurrentUser =
+              data.lastMessageSenderId === userId; // <-- CHECK HERE
+
             if (lastMessageWasByCurrentUser) {
               isUnread = false; // If current user sent the last message, it's NOT unread for them
             } else {
@@ -105,7 +106,7 @@ export default function MessagesScreen() {
                 data.lastUpdated instanceof Timestamp
                   ? data.lastUpdated.toDate().toISOString()
                   : data.lastUpdated;
-        
+
               if (lastUpdatedStr) {
                 try {
                   const lastSeenKey = `lastSeen_${groupId}`;
@@ -127,7 +128,7 @@ export default function MessagesScreen() {
               // If lastUpdatedStr is null/undefined, and not sent by current user,
               // it's likely an old chat or no messages, so isUnread remains false.
             }
-        
+
             return {
               id: groupId,
               title: data.title || "Untitled Group",
@@ -349,7 +350,7 @@ export default function MessagesScreen() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor },
+          { backgroundColor: cardBackgroundColor, borderBottomColor: currentTheme.separator, },
         ]}
       >
         {/* Search Bar */}
@@ -443,7 +444,6 @@ const styles = StyleSheet.create({
   headerContainer: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 15,
     paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
     paddingBottom: 10,
@@ -463,13 +463,6 @@ const styles = StyleSheet.create({
     }),
     zIndex: 10, // Ensures it stays above the list in case of overlap
   },
-  pageTitle: {
-    fontSize: 24, // Slightly larger title
-    fontWeight: "bold",
-    paddingHorizontal: 16, // Match list padding
-    marginTop: 10,
-    marginBottom: 10, // Less margin below title
-  },
   searchContainer: {
     flex: 1,
     flexDirection: "row",
@@ -479,14 +472,6 @@ const styles = StyleSheet.create({
     borderWidth: 0,
     height: 44, // Consistent height
     // Dynamic background and border color
-  },
-  searchBar: {
-    flexDirection: "row",
-    alignItems: "center",
-    borderRadius: 25,
-    paddingHorizontal: 12,
-    borderWidth: 0,
-    height: 42, // Slightly smaller search bar
   },
   searchIcon: {
     marginRight: 8,

@@ -134,7 +134,7 @@ export default function LoginScreen() {
           <View
             style={[
               styles.logoCircle,
-              { backgroundColor: currentTheme.primary + "20" },
+              { backgroundColor: currentTheme.primary + "45" },
             ]}
           >
             <Image

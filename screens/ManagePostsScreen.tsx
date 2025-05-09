@@ -355,7 +355,10 @@ export default function ManagePostsScreen() {
           <View
             style={[
               styles.headerContainer,
-              { backgroundColor: cardBackgroundColor },
+              {
+                backgroundColor: cardBackgroundColor,
+                borderBottomColor: currentTheme.separator,
+              },
             ]}
           >
             <Text
@@ -423,7 +426,10 @@ export default function ManagePostsScreen() {
         <View
           style={[
             styles.headerContainer,
-            { backgroundColor: cardBackgroundColor },
+            {
+              backgroundColor: cardBackgroundColor,
+              borderBottomColor: currentTheme.separator,
+            },
           ]}
         >
           <Text
@@ -455,15 +461,10 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
-    paddingBottom: 10,
-    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    padding: 15,
+    // backgroundColor: currentTheme.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: "transparent", // Use theme border
+    alignItems: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -478,13 +479,8 @@ const styles = StyleSheet.create({
     zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
-    marginTop: "1.9%",
-    marginBottom: 4,
-    // paddingHorizontal: 20,
-    paddingHorizontal: 12,
   },
   listContainer: {
     paddingHorizontal: 5,

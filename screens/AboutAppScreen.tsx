@@ -54,7 +54,10 @@ export default function AboutAppScreen() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor },
+          {
+            backgroundColor: cardBackgroundColor,
+            borderBottomColor: currentTheme.separator,
+          },
         ]}
       >
         {/* Screen Title */}
@@ -130,15 +133,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
-    paddingBottom: 10,
-    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
-    borderBottomWidth: 1,
-    borderBottomColor: "transparent", // Use theme border
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -151,15 +145,23 @@ const styles = StyleSheet.create({
       },
     }),
     zIndex: 10, // Ensures it stays above the list in case of overlap
+    padding: 15,
+    // backgroundColor: currentTheme.cardBackground,
+    borderBottomWidth: 1,
+    // borderBottomColor: currentTheme.separator,
+    alignItems: "center",
   },
   screenTitle: {
-    fontSize: 24,
+    // fontSize: 24,
+    // fontWeight: "bold",
+    // textAlign: "center",
+    // marginVertical: 15, // Add vertical margin for spacing
+    // paddingHorizontal: 20, // Ensure padding if text wraps
+    // marginTop: "1.9%",
+    // marginBottom: 4,
+    fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
-    marginVertical: 15, // Add vertical margin for spacing
-    paddingHorizontal: 20, // Ensure padding if text wraps
-    marginTop: "1.9%",
-    marginBottom: 4,
+    // color: currentTheme.textPrimary,
   },
   scrollContainer: {
     flexGrow: 1, // Ensure content can fill space if short, or scroll if long

@@ -276,12 +276,14 @@ export default function ProfileScreen() {
       style={[styles.safeArea, { backgroundColor: currentTheme.background }]}
     >
       <StatusBar
+        translucent={false}
         backgroundColor={currentTheme.background}
         barStyle={isDark ? "light-content" : "dark-content"}
       />
       <ScrollView
         contentContainerStyle={styles.scrollContentContainer}
         showsVerticalScrollIndicator={false}
+        style={[{ backgroundColor: currentTheme.background }]}
       >
         {/* --- Settings Icon Button (Top Right) --- */}
         {isOwnProfile && (

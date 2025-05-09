@@ -14,4 +14,5 @@ export type RootStackParamList = {
   SavedEvents: undefined;
   HelpAndSupport: undefined;
   AboutApp: undefined;
+  ChangePassword: undefined;
 };

@@ -358,7 +358,10 @@ export default function PostScreen() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor },
+          {
+            backgroundColor: cardBackgroundColor,
+            borderBottomColor: currentTheme.separator,
+          },
         ]}
       >
         {/* Screen Title */}
@@ -634,15 +637,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
-    paddingBottom: 10,
-    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    padding: 15,
+    // backgroundColor: currentTheme.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: "transparent", // Use theme border
+    alignItems: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -662,13 +660,8 @@ const styles = StyleSheet.create({
     paddingBottom: 30,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
-    textAlign: "center",
-    marginVertical: 15, // Add vertical margin for spacing
-    paddingHorizontal: 20, // Ensure padding if text wraps
-    marginTop: "1.9%",
-    marginBottom: 4,
   },
   card: {
     padding: 15,
@@ -695,11 +688,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 5, // More space between inputs
     height: 50, // Consistent height
-    // backgroundColor, borderColor set dynamically
-    // shadowOffset: { width: 0, height: 1 },
-    // shadowOpacity: 0.15,
-    // shadowRadius: 3,
-    // elevation: 1,
   },
   textAreaContainer: {
     flexDirection: "row",
@@ -709,11 +697,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     marginBottom: 5, // More space between inputs
     height: 100, // Consistent height
-    // backgroundColor, borderColor set dynamically
-    // shadowOffset: { width: 0, height: 1 },
-    // shadowOpacity: 0.15,
-    // shadowRadius: 3,
-    // elevation: 1,
   },
   input: {
     flex: 1,

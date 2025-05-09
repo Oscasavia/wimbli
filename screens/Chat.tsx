@@ -104,7 +104,9 @@ export default function Chat() {
   // --- State for Group Actions ---
   const [groupCreatorId, setGroupCreatorId] = useState<string | null>(null);
   const [isProcessingGroupAction, setIsProcessingGroupAction] = useState(false); // Loading state for leave/delete
-  const [groupTitle, setGroupTitle] = useState(initialGroupName || "Group Chat");
+  const [groupTitle, setGroupTitle] = useState(
+    initialGroupName || "Group Chat"
+  );
 
   // --- Theme variable fallbacks ---
   const cardBackgroundColor =
@@ -128,6 +130,11 @@ export default function Chat() {
   const functions = getFunctions(); // Get Firebase Functions instance
   // Make sure 'deleteGroupChat' exactly matches the name you deployed your function with
   const callDeleteGroupChat = httpsCallable(functions, "deleteGroupChat");
+  // Make sure 'sendMessageWithModeration' matches your deployed function name
+  const callSendMessageWithModeration = httpsCallable(
+    functions,
+    "sendMessageWithModeration"
+  );
 
   // Effect to set Navigation Header Title
   useEffect(() => {
@@ -431,6 +438,13 @@ export default function Chat() {
       return;
     }
     const userId = currentUser.uid;
+
+    // Optional: Basic client-side check for immediate UX, but don't rely on it for enforcement.
+    // const CLIENT_SIDE_BAD_WORDS = ["examplebadword"];
+    // if (CLIENT_SIDE_BAD_WORDS.some(word => trimmedInput.toLowerCase().includes(word))) {
+    //   Alert.alert("Heads up!", "Please ensure your message is appropriate.");
+    //   // return; // You might not want to block here, let the server do it.
+    // }
 
     // Fetch sender info ONCE before sending (if not already available/cached)
     // Ideally, get this info on app load or login and store in context/state
@@ -766,7 +780,10 @@ export default function Chat() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor },
+          {
+            backgroundColor: cardBackgroundColor,
+            borderBottomColor: currentTheme.separator,
+          },
         ]}
       >
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
@@ -944,14 +961,10 @@ const styles = StyleSheet.create({
   },
   headerContainer: {
     flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    paddingHorizontal: 15,
-    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
-    paddingBottom: 10,
-    // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
+    padding: 15,
+    // backgroundColor: currentTheme.cardBackground,
     borderBottomWidth: 1,
-    borderBottomColor: "transparent", // Use theme border
+    alignItems: "center",
     ...Platform.select({
       ios: {
         shadowColor: "#000",
@@ -966,13 +979,13 @@ const styles = StyleSheet.create({
     zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     textAlign: "center",
-    marginTop: "1.9%",
-    marginBottom: 4,
-    // paddingHorizontal: 20,
-    paddingHorizontal: 12,
+    // marginTop: "1.9%",
+    // marginBottom: 4,
+    // // paddingHorizontal: 20,
+    // paddingHorizontal: 12,
   },
   keyboardAvoidingContainer: {
     flex: 1,

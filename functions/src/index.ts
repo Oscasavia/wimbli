@@ -279,4 +279,200 @@ export const cleanupSavedPosts = functions.firestore
     }
   });
 
+// --- NEW: HTTPS Callable Function to send a message with moderation ---
+
+// For production, it's better to fetch this list from Firestore (e.g., config/profanityList)
+// This allows updates without redeploying functions.
+const HARDCODED_BAD_WORDS_LIST: string[] = [
+  "KKK",
+  "kkk",
+  "rape",
+  "nigger",
+  "n1gger",
+  "chink",
+  "spic",
+  "kike",
+  "jap",
+  "gook",
+  "faggot",
+  "fag",
+  "tranny",
+  "retard",
+  "retarded",
+  "fuck",
+  "whore",
+  "queef",
+  "twat",
+  "wank",
+  "wanker",
+]; // Replace with your initial list
+
+/**
+ * Censors text by replacing bad words with asterisks.
+ * @param {string} text The input text.
+ * @param {string[]} badWords An array of words to censor.
+ * @return {{ censoredText: string; wasCensored: boolean }}
+ */
+function censorText(
+  text: string,
+  badWords: string[]
+): { censoredText: string; wasCensored: boolean } {
+  let newText = text;
+  let censored = false;
+  badWords.forEach((word) => {
+    // \b ensures whole word matching. 'gi' for global, case-insensitive.
+    const regex = new RegExp(`\\b${word}\\b`, "gi");
+    if (regex.test(newText)) {
+      newText = newText.replace(regex, "*".repeat(word.length));
+      censored = true;
+    }
+  });
+  return { censoredText: newText, wasCensored: censored };
+}
+
+export const sendMessageWithModeration = onCall(async (request) => {
+  // 1. Authentication Check
+  if (!request.auth) {
+    logger.error("[sendMessageWithModeration] Error: User not authenticated.");
+    throw new HttpsError(
+      "unauthenticated",
+      "The function must be called while authenticated."
+    );
+  }
+  const senderId = request.auth.uid;
+
+  // 2. Input Validation
+  const { groupId, text, replyToMessageText, replyToSenderName } = request.data;
+
+  if (
+    !groupId ||
+    typeof groupId !== "string" ||
+    !text ||
+    typeof text !== "string" ||
+    text.trim() === ""
+  ) {
+    logger.error(
+      "[sendMessageWithModeration] Invalid arguments received:",
+      request.data
+    );
+    throw new HttpsError(
+      "invalid-argument",
+      "Required 'groupId' (string) and 'text' (non-empty string) arguments."
+    );
+  }
+  const trimmedText = text.trim();
+
+  logger.info(
+    `[sendMessageWithModeration] User: ${senderId}, Group: ${groupId}, Original Text: "${trimmedText}"`
+  );
+
+  // 3. Fetch Sender Information (for denormalization in the message object)
+  let senderName = "Unknown User";
+  let senderAvatar: string | null = null;
+  try {
+    const userDocRef = db.collection("users").doc(senderId);
+    const userDoc = await userDocRef.get();
+    if (userDoc.exists) {
+      const userData = userDoc.data();
+      senderName = userData?.username || "Unknown User"; // Ensure 'username' is correct field
+      senderAvatar = userData?.profilePicture || null; // Ensure 'profilePicture' is correct field
+    } else {
+      logger.warn(
+        `[sendMessageWithModeration] User document not found for senderId: ${senderId}`
+      );
+    }
+  } catch (error) {
+    logger.error(
+      `[sendMessageWithModeration] Error fetching user data for senderId ${senderId}:`,
+      error
+    );
+    // Decide if you want to proceed with defaults or throw an error
+  }
+
+  // 4. Content Moderation
+  // Option A: Use hardcoded list (as defined above)
+  let currentBadWords = HARDCODED_BAD_WORDS_LIST;
+
+  // Option B: Fetch bad words list from Firestore (more flexible for production)
+  // try {
+  //   const badWordsDoc = await db.collection("config").doc("profanityList").get();
+  //   if (badWordsDoc.exists) {
+  //     currentBadWords = badWordsDoc.data()?.wordsArray || HARDCODED_BAD_WORDS_LIST; // Assuming 'wordsArray' field
+  //   }
+  // } catch (fetchError) {
+  //   logger.error("[sendMessageWithModeration] Error fetching profanity list from Firestore, using defaults:", fetchError);
+  // }
+
+  const { censoredText, wasCensored } = censorText(
+    trimmedText,
+    currentBadWords
+  );
+
+  // --- Alternative: Reject message if bad words found (instead of censoring) ---
+  // if (wasCensored) {
+  //   logger.warn(`[sendMessageWithModeration] Message from ${senderId} to group ${groupId} blocked due to profanity. Original: "${trimmedText}"`);
+  //   throw new HttpsError(
+  //     "invalid-argument", // This error code can be specifically handled by the client
+  //     "Your message contains inappropriate language and was not sent."
+  //   );
+  // }
+
+  // 5. Prepare Message Data
+  const messageData: any = {
+    // Define a proper interface for this in a shared types file if possible
+    text: censoredText,
+    senderId: senderId,
+    senderName: senderName,
+    senderAvatar: senderAvatar,
+    timestamp: admin.firestore.FieldValue.serverTimestamp(), // Reliable server-side timestamp
+    likedBy: [], // Initialize likes
+    isCensored: wasCensored,
+    ...(wasCensored && { originalText: trimmedText }), // Optionally store original text if censored
+    ...(replyToMessageText &&
+      typeof replyToMessageText === "string" && {
+        // Add reply info if present
+        replyToMessageText: replyToMessageText,
+        replyToSenderName:
+          typeof replyToSenderName === "string" ? replyToSenderName : "User",
+      }),
+  };
+
+  // 6. Firestore Operations: Add message and update group document in a batch
+  const groupRef = db.collection("groups").doc(groupId);
+  const newMessageRef = groupRef.collection("messages").doc(); // Auto-generate ID for the new message
+
+  const batch = db.batch();
+  batch.set(newMessageRef, messageData); // Set the new message
+  batch.update(groupRef, {
+    // Update the parent group
+    lastMessage: censoredText.substring(0, 60), // Store a snippet for display
+    lastUpdated: messageData.timestamp, // This will be the server timestamp after commit
+    lastMessageId: newMessageRef.id,
+    lastMessageSenderId: senderId,
+  });
+
+  try {
+    await batch.commit();
+    logger.info(
+      `[sendMessageWithModeration] Message ${newMessageRef.id} from ${senderId} sent to group ${groupId}. Censored: ${wasCensored}`
+    );
+    return {
+      success: true,
+      messageId: newMessageRef.id,
+      status: "Message sent successfully.",
+      text: censoredText, // Send back the (potentially) censored text
+      wasCensored: wasCensored,
+    };
+  } catch (error) {
+    logger.error(
+      `[sendMessageWithModeration] Error committing message batch for group ${groupId}, user ${senderId}:`,
+      error
+    );
+    throw new HttpsError(
+      "internal",
+      "An error occurred while sending your message. Please try again."
+    );
+  }
+});
+
 // Add any other functions below, using v2 syntax (e.g., onCall, onDocumentWritten)

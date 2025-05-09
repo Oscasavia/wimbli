@@ -24,6 +24,7 @@ import FullImageScreen from "./screens/FullImageScreen";
 import SavedEventsScreen from "./screens/SavedEventsScreen";
 import HelpAndSupportScreen from "./screens/HelpAndSupportScreen";
 import AboutAppScreen from "./screens/AboutAppScreen";
+import ChangePasswordScreen from "./screens/ChangePasswordScreen";
 import Chat from "./screens/Chat";
 
 const Stack = createNativeStackNavigator();
@@ -85,6 +86,10 @@ export default function App() {
           <Stack.Screen name="FullImage" component={FullImageScreen} />
           <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
           <Stack.Screen name="Settings" component={SettingsScreen} />
+          <Stack.Screen
+            name="ChangePassword"
+            component={ChangePasswordScreen}
+          />
           <Stack.Screen
             name="HelpAndSupport"
             component={HelpAndSupportScreen}
