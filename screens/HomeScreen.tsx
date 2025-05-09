@@ -864,7 +864,7 @@ export default function HomeScreen() {
       {!loading &&
         !isFetchingLocation &&
         upcomingSpontaneousEvents.length > 0 && (
-          <View style={styles.spontaneousSection}>
+          <View style={[styles.spontaneousSection, {borderBottomColor: currentTheme.separator,}]}>
             <Text
               style={[
                 styles.sectionHeader,
@@ -1856,9 +1856,9 @@ const styles = StyleSheet.create({
   },
   // ---- Styles for the Spontaneous Section ----
   spontaneousSection: {
-    paddingVertical: 10,
+    paddingVertical: 5,
     // Optional: add a border or slightly different background for this section
-    // borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomWidth: StyleSheet.hairlineWidth,
     // borderBottomColor: currentTheme.separator, // Use theme color
   },
   sectionHeader: {
@@ -1871,7 +1871,7 @@ const styles = StyleSheet.create({
   },
   horizontalListContainer: {
     paddingHorizontal: 10, // Start cards a bit inset from the edge
-    paddingVertical: 5,
+    paddingVertical: 1,
   },
   // Spontaneous badge styles from your renderPostCard, ensure they are here
   spontaneousBadge: {

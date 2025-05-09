@@ -1067,7 +1067,7 @@ const styles = StyleSheet.create({
   },
   textInput: {
     flex: 1,
-    paddingVertical: Platform.OS === "ios" ? 10 : 8, // Adjusted padding
+    paddingVertical: Platform.OS === "ios" ? 10 : 12, // Adjusted padding
     fontSize: 16,
     maxHeight: 100,
   },

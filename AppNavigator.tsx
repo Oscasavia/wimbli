@@ -61,7 +61,7 @@ export default function AppNavigator() {
         headerShown: false, // Keep headers managed by individual screens or stack navigators
         tabBarShowLabel: true, // **Enable labels**
         tabBarStyle: {
-          height: Platform.OS === "ios" ? 65 : 60, // Adjust height (consider labels)
+          height: Platform.OS === "ios" ? 65 : 50, // Adjust height (consider labels)
           backgroundColor: barBackgroundColor,
           borderTopColor: "transparent",
           // Shadow (adjust as needed)
@@ -237,8 +237,8 @@ const styles = StyleSheet.create({
   createButton: {
     // Position button slightly elevated
     top: -25, // Adjust elevation amount
-    width: 65, // Slightly smaller FAB
-    height: 65,
+    width: 62, // Slightly smaller FAB
+    height: 62,
     borderRadius: 32.5, // Keep it circular
     backgroundColor: "#00ACC1", // Set dynamically
     justifyContent: "center",
