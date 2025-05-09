@@ -160,7 +160,7 @@ export default function InterestsScreen() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor },
+          { backgroundColor: cardBackgroundColor, borderBottomColor: currentTheme.separator, },
         ]}
       >
         <Text style={[styles.title, { color: currentTheme.textPrimary }]}>
@@ -230,15 +230,13 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     paddingHorizontal: 20, // Horizontal padding for content
-    paddingTop: 40, // Space from top safe area
+    paddingTop: 30, // Space from top safe area
     paddingBottom: 15, // Space from bottom safe area
   },
   headerContainer: {
-    // flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
     paddingHorizontal: 15,
-    paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
+    // paddingTop: Platform.OS === "android" ? 15 : 10, // Adjust top padding
     paddingBottom: 10,
     // backgroundColor: currentTheme.background, // Optional: if header needs distinct bg
     borderBottomWidth: 1,
@@ -257,9 +255,8 @@ const styles = StyleSheet.create({
     zIndex: 10, // Ensures it stays above the list in case of overlap
   },
   title: {
-    fontSize: 26, // Adjusted size
+    fontSize: 20, // Adjusted size
     fontWeight: "bold",
-    textAlign: "center",
     marginBottom: 10, // Less margin below title
     // color set dynamically
   },
@@ -306,6 +303,8 @@ const styles = StyleSheet.create({
     borderRadius: 25, // Consistent rounded button
     alignItems: "center",
     justifyContent: "center",
+    marginLeft: 20,
+    marginRight: 20,
     marginTop: 20, // Space above button
     minHeight: 48, // Ensure consistent button height even with loader
     // Dynamic backgroundColor

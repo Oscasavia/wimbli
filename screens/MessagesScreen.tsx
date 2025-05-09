@@ -21,6 +21,7 @@ import {
 import { db, auth } from "../firebase";
 import { Feather } from "@expo/vector-icons"; // Use Feather icons
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useUnreadMessages } from "../UnreadContext";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -42,6 +43,7 @@ export default function MessagesScreen() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [search, setSearch] = useState("");
   const [loading, setLoading] = useState(true); // Add loading state
+  const { setHasUnreadMessages } = useUnreadMessages(); // Get the setter from context
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
@@ -64,131 +66,150 @@ export default function MessagesScreen() {
       console.log("MessagesScreen: No user logged in.");
       setLoading(false); // Stop loading if no user
       setGroups([]); // Clear groups if logged out
+      setHasUnreadMessages(false);
       return; // Exit if no user
     }
 
     setLoading(true);
-    const userId = currentUser.uid;
+    const currentUserId = currentUser.uid; // Use this definitively
 
-    // OPTIMIZATION NOTE: Ideally, filter server-side for better performance:
-    // const q = query(collection(db, "groups"), where('members', 'array-contains', userId));
-    // The code below uses the original client-side filtering approach for now.
-    const q = query(collection(db, "groups"));
+    // It's highly recommended to filter groups server-side for performance and scalability
+    const groupsQuery = query(
+      collection(db, "groups"),
+      where("members", "array-contains", currentUserId)
+    );
 
-    console.log("MessagesScreen: Setting up groups listener...");
+    console.log(
+      `MessagesScreen: Setting up groups listener for user ${currentUserId}...`
+    );
     const unsubscribe = onSnapshot(
-      q,
+      groupsQuery, // Use the server-filtered query
       async (snapshot) => {
         console.log(
-          `MessagesScreen: Snapshot received. Size: ${snapshot.size}`
+          `MessagesScreen: Snapshot received for user ${currentUserId}. Size: ${snapshot.size}`
         );
-        // Process docs async to fetch AsyncStorage data concurrently
         const groupPromises = snapshot.docs.map(
           async (docSnap): Promise<Group | null> => {
             const data = docSnap.data();
             const groupId = docSnap.id;
 
-            // Client-side filter (keep or use server-side as noted)
-            if (!data.members || !data.members.includes(userId)) {
-              return null; // User not a member
-            }
+            // No need for client-side member check if server-side filter is used and correct
+            // if (!data.members || !data.members.includes(currentUserId)) {
+            //   return null;
+            // }
 
-            // Calculate unread status
             let isUnread = false;
             const lastMessageWasByCurrentUser =
-              data.lastMessageSenderId === userId; // <-- CHECK HERE
+              data.lastMessageSenderId === currentUserId; // Compare with fresh currentUserId
 
             if (lastMessageWasByCurrentUser) {
-              isUnread = false; // If current user sent the last message, it's NOT unread for them
+              isUnread = false;
             } else {
-              // Original logic if someone else sent the last message
-              const lastUpdatedStr =
-                data.lastUpdated instanceof Timestamp
-                  ? data.lastUpdated.toDate().toISOString()
-                  : data.lastUpdated;
-
-              if (lastUpdatedStr) {
-                try {
-                  const lastSeenKey = `lastSeen_${groupId}`;
-                  const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
-                  if (lastSeenStr) {
-                    isUnread = new Date(lastUpdatedStr) > new Date(lastSeenStr);
-                  } else {
-                    // If never seen, but there's an update, consider it unread
-                    isUnread = true;
-                  }
-                } catch (error) {
-                  console.error(
-                    `Error reading AsyncStorage for group ${groupId}:`,
-                    error
-                  );
-                  isUnread = false; // Default to not unread on error
+              // ... rest of your existing date comparison logic for unread status ...
+              // Ensure you use 'currentUserId' consistently if needed inside this block for other checks
+              const lastUpdatedFromData = data.lastUpdated;
+              if (lastUpdatedFromData) {
+                let lastUpdatedDate: Date | null = null;
+                if (lastUpdatedFromData instanceof Timestamp) {
+                  lastUpdatedDate = lastUpdatedFromData.toDate();
+                } else if (typeof lastUpdatedFromData === "string") {
+                  const parsedDate = new Date(lastUpdatedFromData);
+                  if (!isNaN(parsedDate.getTime()))
+                    lastUpdatedDate = parsedDate;
+                } else if (typeof lastUpdatedFromData === "number") {
+                  const parsedDate = new Date(lastUpdatedFromData);
+                  if (!isNaN(parsedDate.getTime()))
+                    lastUpdatedDate = parsedDate;
                 }
-              }
-              // If lastUpdatedStr is null/undefined, and not sent by current user,
-              // it's likely an old chat or no messages, so isUnread remains false.
-            }
 
+                if (lastUpdatedDate) {
+                  try {
+                    const lastSeenKey = `lastSeen_${groupId}`;
+                    const lastSeenStr = await AsyncStorage.getItem(lastSeenKey);
+                    if (lastSeenStr) {
+                      const lastSeenDate = new Date(lastSeenStr);
+                      if (!isNaN(lastSeenDate.getTime())) {
+                        isUnread = lastUpdatedDate > lastSeenDate;
+                      } else {
+                        isUnread = true;
+                      }
+                    } else {
+                      isUnread = true;
+                    }
+                  } catch (error) {
+                    console.error(`AsyncStorage error for ${groupId}:`, error);
+                    isUnread = false;
+                  }
+                } else {
+                  isUnread = false;
+                }
+              } else {
+                isUnread = false;
+              }
+            }
+            // ... return group object with isUnread ...
             return {
               id: groupId,
               title: data.title || "Untitled Group",
               members: data.members || [],
               lastMessage: data.lastMessage || "",
               lastUpdated: data.lastUpdated || null,
-              lastMessageSenderId: data.lastMessageSenderId || null, // <-- Get this from data
+              lastMessageSenderId: data.lastMessageSenderId || null,
               isUnread,
             };
           }
         );
-
+        // ... Promise.all logic ...
         try {
           const resolvedGroupsNullable = await Promise.all(groupPromises);
           const userGroups = resolvedGroupsNullable.filter(
             (group) => group !== null
           ) as Group[];
-
-          // Sort groups by lastUpdated (most recent first)
           const sorted = userGroups.sort((a, b) => {
+            /* ... your sorting logic ... */
             const timeA = a.lastUpdated
               ? a.lastUpdated instanceof Timestamp
                 ? a.lastUpdated.toMillis()
-                : new Date(a.lastUpdated).getTime()
+                : new Date(a.lastUpdated as string).getTime()
               : 0;
             const timeB = b.lastUpdated
               ? b.lastUpdated instanceof Timestamp
                 ? b.lastUpdated.toMillis()
-                : new Date(b.lastUpdated).getTime()
+                : new Date(b.lastUpdated as string).getTime()
               : 0;
-            const validTimeA = isNaN(timeA) ? 0 : timeA;
-            const validTimeB = isNaN(timeB) ? 0 : timeB;
-            return validTimeB - validTimeA; // Descending order
+            return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
           });
-
           setGroups(sorted);
-          console.log(
-            `MessagesScreen: Groups state updated with ${sorted.length} groups.`
-          );
+
+          // Determine if there are ANY unread messages and update context
+          const anyUnread = sorted.some((group) => group.isUnread === true);
+          setHasUnreadMessages(anyUnread);
+          console.log(`MessagesScreen: Overall unread status: ${anyUnread}`);
+          // setHasUnreadMessages(false); // Default on error
         } catch (error) {
           console.error("MessagesScreen: Error processing groups:", error);
-          // Optionally show an error to the user
         } finally {
           setLoading(false);
-          console.log("MessagesScreen: Loading set to false.");
         }
       },
       (error) => {
-        console.error("MessagesScreen: Error on groups listener:", error);
+        console.error(
+          `MessagesScreen: Error on groups listener for user ${currentUserId}:`,
+          error
+        );
         Alert.alert("Error", "Could not load your chats.");
         setLoading(false);
+        setHasUnreadMessages(false); // Default on error
       }
     );
 
-    // Cleanup listener on unmount
     return () => {
-      console.log("MessagesScreen: Unsubscribing groups listener.");
+      console.log(
+        `MessagesScreen: Unsubscribing groups listener for user ${currentUserId}.`
+      );
       unsubscribe();
     };
-  }, []); // Run only on mount (or user change if auth logic was outside)
+  }, [auth.currentUser, setHasUnreadMessages]); // Run only on mount (or user change if auth logic was outside)
 
   useFocusEffect(
     useCallback(() => {
@@ -256,12 +277,16 @@ export default function MessagesScreen() {
         `lastSeen_${group.id}`,
         new Date().toISOString()
       );
-      // Optimistically update UI state to remove unread indicator
-      setGroups((prevGroups) =>
-        prevGroups.map((g) =>
-          g.id === group.id ? { ...g, isUnread: false } : g
-        )
+      // Optimistically update UI
+      const updatedGroups = groups.map((g) =>
+        g.id === group.id ? { ...g, isUnread: false } : g
       );
+      setGroups(updatedGroups);
+
+      // Recalculate overall unread status after marking one as read
+      const anyUnreadAfterOpen = updatedGroups.some((g) => g.isUnread === true);
+      setHasUnreadMessages(anyUnreadAfterOpen);
+
       // Navigate
       navigation.navigate("Chat", {
         groupId: group.id,
@@ -350,7 +375,10 @@ export default function MessagesScreen() {
       <View
         style={[
           styles.headerContainer,
-          { backgroundColor: cardBackgroundColor, borderBottomColor: currentTheme.separator, },
+          {
+            backgroundColor: cardBackgroundColor,
+            borderBottomColor: currentTheme.separator,
+          },
         ]}
       >
         {/* Search Bar */}

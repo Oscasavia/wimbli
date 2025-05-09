@@ -14,7 +14,7 @@ import { useTheme } from "./ThemeContext"; // Adjust path if needed
 import { lightTheme, darkTheme } from "./themeColors"; // Adjust path if needed
 import * as NavigationBar from "expo-navigation-bar";
 import { useEffect } from "react";
-
+import { useUnreadMessages } from './UnreadContext';
 // Import Screen Components
 import HomeScreen from "./screens/HomeScreen";
 import PostScreen from "./screens/PostScreen";
@@ -30,6 +30,8 @@ export default function AppNavigator() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
+
+  const { hasUnreadMessages } = useUnreadMessages(); // Consume the context
 
   // Define theme colors with fallbacks for clarity
   const activeColor =
@@ -86,6 +88,7 @@ export default function AppNavigator() {
         tabBarIcon: ({ focused, color, size }) => {
           let iconName: keyof typeof Feather.glyphMap = "home"; // Default icon
           const iconSize = focused ? size + 1 : size; // Slightly larger when focused
+          let showUnreadDotForThisIcon = false;
 
           switch (route.name) {
             case "Home":
@@ -98,7 +101,10 @@ export default function AppNavigator() {
               // Custom button handles its own icon
               return null; // Return null for icon here, handled by tabBarButton
             case "Messages":
-              iconName = "message-square"; // Use Feather's message icon
+              iconName = "message-square";
+              if (hasUnreadMessages) { // Check the global unread status
+                showUnreadDotForThisIcon = true;
+              }
               break;
             case "Profile":
               iconName = "user";
@@ -112,7 +118,26 @@ export default function AppNavigator() {
           }
 
           // Return Feather icon for standard tabs
-          return <Feather name={iconName} size={iconSize} color={color} />;
+          return (
+            <View style={{ width: iconSize + 10, height: iconSize + 10, alignItems: 'center', justifyContent: 'center' }}>
+              <Feather name={iconName} size={iconSize} color={color} />
+              {showUnreadDotForThisIcon && (
+                <View
+                  style={{
+                    position: 'absolute',
+                    right: 2,   // Adjust for better positioning over/near the icon
+                    top: 0,     // Adjust for better positioning
+                    backgroundColor: currentTheme.error || 'red', // Use a distinct notification color
+                    width: 9,
+                    height: 9,
+                    borderRadius: 4.5,
+                    borderWidth: 1.5, // Optional: make dot stand out
+                    borderColor: barBackgroundColor, // Match tab bar background
+                  }}
+                />
+              )}
+            </View>
+          );
         },
         // ...(Platform.OS === 'android' ? { pressColor: 'transparent' } : {}), // Disables Android ripple effect
         // pressOpacity: 1, // Disables opacity change on press for iOS or older Android

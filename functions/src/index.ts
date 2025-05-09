@@ -305,6 +305,8 @@ const HARDCODED_BAD_WORDS_LIST: string[] = [
   "twat",
   "wank",
   "wanker",
+  "fucking",
+  "motherfucker"
 ]; // Replace with your initial list
 
 /**

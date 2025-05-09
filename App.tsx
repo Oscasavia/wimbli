@@ -20,6 +20,7 @@ import WebViewScreen from "./screens/WebViewScreen";
 import ForgotPasswordScreen from "./screens/ForgotPasswordScreen";
 import SettingsScreen from "./screens/SettingsScreen";
 import { ThemeProvider } from "./ThemeContext";
+import { UnreadProvider } from "./UnreadContext";
 import FullImageScreen from "./screens/FullImageScreen";
 import SavedEventsScreen from "./screens/SavedEventsScreen";
 import HelpAndSupportScreen from "./screens/HelpAndSupportScreen";
@@ -61,42 +62,44 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName={initialRoute}
-          screenOptions={{
-            headerShown: false,
-            animation: "none",
-            gestureEnabled: false,
-          }}
-        >
-          <Stack.Screen name="Splash" component={SplashScreen} />
-          <Stack.Screen name="Login" component={LoginScreen} />
-          <Stack.Screen name="Signup" component={SignupScreen} />
-          <Stack.Screen
-            name="ForgotPassword"
-            component={ForgotPasswordScreen}
-          />
-          <Stack.Screen name="WebView" component={WebViewScreen} />
-          <Stack.Screen name="Main" component={AppTabs} />
-          <Stack.Screen name="Chat" component={Chat} />
-          <Stack.Screen name="Interests" component={InterestsScreen} />
-          <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-          <Stack.Screen name="EditPost" component={PostScreen} />
-          <Stack.Screen name="FullImage" component={FullImageScreen} />
-          <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
-          <Stack.Screen name="Settings" component={SettingsScreen} />
-          <Stack.Screen
-            name="ChangePassword"
-            component={ChangePasswordScreen}
-          />
-          <Stack.Screen
-            name="HelpAndSupport"
-            component={HelpAndSupportScreen}
-          />
-          <Stack.Screen name="AboutApp" component={AboutAppScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
+      <UnreadProvider>
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName={initialRoute}
+            screenOptions={{
+              headerShown: false,
+              animation: "none",
+              gestureEnabled: false,
+            }}
+          >
+            <Stack.Screen name="Splash" component={SplashScreen} />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Signup" component={SignupScreen} />
+            <Stack.Screen
+              name="ForgotPassword"
+              component={ForgotPasswordScreen}
+            />
+            <Stack.Screen name="WebView" component={WebViewScreen} />
+            <Stack.Screen name="Main" component={AppTabs} />
+            <Stack.Screen name="Chat" component={Chat} />
+            <Stack.Screen name="Interests" component={InterestsScreen} />
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="EditPost" component={PostScreen} />
+            <Stack.Screen name="FullImage" component={FullImageScreen} />
+            <Stack.Screen name="SavedEvents" component={SavedEventsScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen
+              name="ChangePassword"
+              component={ChangePasswordScreen}
+            />
+            <Stack.Screen
+              name="HelpAndSupport"
+              component={HelpAndSupportScreen}
+            />
+            <Stack.Screen name="AboutApp" component={AboutAppScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </UnreadProvider>
     </ThemeProvider>
   );
 }
