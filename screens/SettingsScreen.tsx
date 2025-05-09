@@ -10,6 +10,7 @@ import {
   ScrollView, // Added ScrollView
   Platform, // Added Platform
   ActivityIndicator, // Added for delete/logout potentially
+  Linking,
 } from "react-native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
@@ -143,6 +144,21 @@ export default function SettingsScreen() {
       }
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  // --- NEW: Function to handle opening URLs ---
+  const handleOpenURL = async (url: string) => {
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert("Error", `Cannot open this URL: ${url}`);
+      }
+    } catch (error) {
+      console.error("Error opening URL:", error);
+      Alert.alert("Error", "Could not open the link. Please try again.");
     }
   };
 
@@ -344,11 +360,7 @@ export default function SettingsScreen() {
             "shield",
             "Privacy Policy",
             renderChevron(),
-            () =>
-              Alert.alert(
-                "Coming Soon",
-                "Privacy Policy link will be added later."
-              ), // Placeholder action
+            () => handleOpenURL("https://lovely-unicorn-a7167c.netlify.app/"),
             false
           )}
           {renderSettingRow(
@@ -356,10 +368,7 @@ export default function SettingsScreen() {
             "Terms of Service",
             renderChevron(),
             () =>
-              Alert.alert(
-                "Coming Soon",
-                "Terms of Service link will be added later."
-              ), // Placeholder action
+              handleOpenURL("https://cerulean-biscotti-582837.netlify.app/"),
             false, // isFirstInSection
             true // isLastInSection
           )}

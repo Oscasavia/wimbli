@@ -6,6 +6,7 @@ import { onSchedule } from "firebase-functions/v2/scheduler";
 import * as functions from "firebase-functions";
 import * as logger from "firebase-functions/logger"; // Use v2 logger
 import * as admin from "firebase-admin";
+import { onDocumentWritten } from "firebase-functions/v2/firestore"; // For v2 Firestore triggers
 
 // Initialize Firebase Admin SDK (only once)
 admin.initializeApp();
@@ -306,7 +307,7 @@ const HARDCODED_BAD_WORDS_LIST: string[] = [
   "wank",
   "wanker",
   "fucking",
-  "motherfucker"
+  "motherfucker",
 ]; // Replace with your initial list
 
 /**
@@ -476,5 +477,130 @@ export const sendMessageWithModeration = onCall(async (request) => {
     );
   }
 });
+
+const IMMEDIATE_KEYWORDS: string[] = [
+  "now",
+  "live",
+  "live now",
+  "happening now",
+  "starting soon",
+  "kicking off soon",
+  "in 30 mins",
+  "in 30 minutes",
+  "in an hour",
+  "within the hour",
+  "tonight",
+  "this evening",
+  "today only",
+  "flash event",
+  "pop up",
+  "pop-up", // Added "pop up"
+  "impromptu",
+  "last minute",
+  "urgent",
+  "right away",
+];
+const SPONTANEOUS_HOURS_THRESHOLD = 6; // Events within the next 6 hours can be considered spontaneous
+
+export const flagSpontaneousPost = onDocumentWritten(
+  "posts/{postId}", // Listen to writes on any document in the 'posts' collection
+  async (event) => {
+    const postId = event.params.postId;
+    logger.info(`[flagSpontaneousPost] Triggered for post ID: ${postId}`);
+
+    // If the document was deleted, or there's no 'after' state, or 'after' doesn't exist, do nothing.
+    if (!event.data || !event.data.after || !event.data.after.exists) {
+      logger.info(
+        `[flagSpontaneousPost] Post ${postId} was deleted or 'after' data is missing. No action.`
+      );
+      return null;
+    }
+
+    const postData = event.data.after.data(); // This can return DocumentData | undefined
+
+    // ---- ADD THIS CHECK ----
+    if (!postData) {
+      logger.warn(
+        `[flagSpontaneousPost] Post data is undefined for existing document ${postId}. This might indicate an empty document or a data conversion issue. No action.`
+      );
+      return null;
+    }
+    // ---- END OF ADDED CHECK ----
+
+    // Now TypeScript knows postData is defined.
+    const currentIsSpontaneousValue = postData.isSpontaneous === true; // Default to false if not present
+
+    const title = (postData.title || "").toLowerCase(); // Safely access title
+    const description = (postData.description || "").toLowerCase(); // Safely access description
+    const eventFirestoreTimestamp = postData.date; // Access date
+
+    let calculatedIsSpontaneous = false;
+
+    // 1. Keyword Check in title or description
+    const textToAnalyze = `${title} ${description}`; // title and description are now guaranteed to be strings
+    for (const keyword of IMMEDIATE_KEYWORDS) {
+      // Assuming IMMEDIATE_KEYWORDS is defined above
+      if (textToAnalyze.includes(keyword)) {
+        calculatedIsSpontaneous = true;
+        logger.info(
+          `[flagSpontaneousPost] Keyword match for post ${postId}: "${keyword}"`
+        );
+        break;
+      }
+    }
+
+    // 2. Date/Time Proximity Check
+    if (
+      eventFirestoreTimestamp &&
+      typeof eventFirestoreTimestamp.toDate === "function"
+    ) {
+      const eventDate = eventFirestoreTimestamp.toDate();
+      const now = new Date();
+      const thresholdInMilliseconds =
+        SPONTANEOUS_HOURS_THRESHOLD * 60 * 60 * 1000; // Assuming SPONTANEOUS_HOURS_THRESHOLD is defined
+
+      if (
+        eventDate.getTime() > now.getTime() &&
+        eventDate.getTime() - now.getTime() < thresholdInMilliseconds
+      ) {
+        calculatedIsSpontaneous = true;
+        logger.info(
+          `[flagSpontaneousPost] Date proximity match for post ${postId}. Event is within ${SPONTANEOUS_HOURS_THRESHOLD} hours.`
+        );
+      }
+    } else {
+      logger.warn(
+        `[flagSpontaneousPost] Post ${postId} has missing or invalid 'date' Timestamp field for proximity check.`
+      );
+    }
+
+    // Only update the document if the 'isSpontaneous' flag has changed
+    if (calculatedIsSpontaneous !== currentIsSpontaneousValue) {
+      logger.info(
+        `[flagSpontaneousPost] Updating 'isSpontaneous' for post ${postId} from ${currentIsSpontaneousValue} to ${calculatedIsSpontaneous}.`
+      );
+      try {
+        await event.data.after.ref.update({
+          isSpontaneous: calculatedIsSpontaneous,
+          lastAutoFlaggedAt: admin.firestore.FieldValue.serverTimestamp(),
+        });
+        logger.info(
+          `[flagSpontaneousPost] Successfully updated 'isSpontaneous' flag for post ${postId}.`
+        );
+      } catch (error) {
+        logger.error(
+          `[flagSpontaneousPost] Error updating post ${postId} with 'isSpontaneous' flag:`,
+          error
+        );
+      }
+    } else {
+      logger.info(
+        `[flagSpontaneousPost] 'isSpontaneous' flag for post ${postId} is already ${currentIsSpontaneousValue}. No update needed.`
+      );
+    }
+
+    return null;
+  }
+);
 
 // Add any other functions below, using v2 syntax (e.g., onCall, onDocumentWritten)

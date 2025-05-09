@@ -55,6 +55,8 @@ const DISTANCE_OPTIONS = {
   "5mi": { label: "Within 5 miles", value: "5mi", miles: 5 },
   "10mi": { label: "Within 10 miles", value: "10mi", miles: 10 },
   "25mi": { label: "Within 25 miles", value: "25mi", miles: 25 }, // Added more options
+  "50mi": { label: "Within 50 miles", value: "50mi", miles: 50 },
+  "100mi": { label: "Within 100 miles", value: "100mi", miles: 100 },
 };
 const KM_PER_MILE = 1.60934; // Conversion factor
 
@@ -72,6 +74,7 @@ type Post = {
   creatorProfilePic?: string; // Renamed for clarity, matches PostScreen
   coordinates?: GeoPoint; // Added GeoPoint coordinates
   geohash?: string; // Added geohash
+  isSpontaneous?: boolean;
   // Add other fields if they exist
 };
 
@@ -125,6 +128,9 @@ export default function HomeScreen() {
   } | null>(null);
   const [locationError, setLocationError] = useState<string | null>(null); // For location errors
   const [isFetchingLocation, setIsFetchingLocation] = useState(false); // Location fetching state
+  const [upcomingSpontaneousEvents, setUpcomingSpontaneousEvents] = useState<
+    Post[]
+  >([]);
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -142,6 +148,29 @@ export default function HomeScreen() {
   const placeholderTextColor = currentTheme.textSecondary || "#8e8e93";
   const shadowColor = currentTheme.shadowColor || "#000";
   const savedIconColor = currentTheme.primary || "blue"; // Color for saved bookmark
+
+  useEffect(() => {
+    const filtered = posts
+      .filter(
+        (post) =>
+          post.isSpontaneous &&
+          post.date &&
+          (post.date instanceof Timestamp
+            ? post.date.toDate()
+            : new Date(post.date)) > new Date()
+      )
+      .sort((a, b) => {
+        // Sort by date, closest first
+        const dateA = (
+          a.date instanceof Timestamp ? a.date.toDate() : new Date(a.date)
+        ).getTime();
+        const dateB = (
+          b.date instanceof Timestamp ? b.date.toDate() : new Date(b.date)
+        ).getTime();
+        return dateA - dateB;
+      });
+    setUpcomingSpontaneousEvents(filtered);
+  }, [posts]); // Re-filter when the main posts list changes
 
   // --- Function to get User Location ---
   const getUserLocation = useCallback(async () => {
@@ -630,7 +659,7 @@ export default function HomeScreen() {
             },
           ]}
         >
-          {/* Top Row: Creator Info + Bookmark */}
+          {/* Top Row: Creator Info + Bookmark + Spontaneous Badge */}
           <View style={styles.cardTopRow}>
             <TouchableOpacity
               style={styles.creatorInfoSmall}
@@ -657,20 +686,36 @@ export default function HomeScreen() {
                 {item.creatorUsername || "Unknown"}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity
-              onPress={(e) => {
-                e.stopPropagation(); // Prevent card press when tapping bookmark
-                handleToggleSave(item.id);
-              }}
-              style={styles.saveIconButton}
-            >
-              <Feather
-                name="bookmark"
-                size={22}
-                color={isSaved ? savedIconColor : currentTheme.textSecondary}
-                fill={isSaved ? savedIconColor : "none"} // Fill icon when saved
-              />
-            </TouchableOpacity>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {item.isSpontaneous &&
+                // Make sure item.date is valid and in the future for the badge to be most relevant
+                (item.date instanceof Timestamp
+                  ? item.date.toDate()
+                  : new Date(item.date)) > new Date() && (
+                  <View
+                    style={[
+                      styles.spontaneousBadge,
+                      { backgroundColor: currentTheme.error || "red" },
+                    ]}
+                  >
+                    <Text style={styles.spontaneousBadgeText}>🔥 Now</Text>
+                  </View>
+                )}
+              <TouchableOpacity
+                onPress={(e) => {
+                  e.stopPropagation(); // Prevent card press when tapping bookmark
+                  handleToggleSave(item.id);
+                }}
+                style={styles.saveIconButton}
+              >
+                <Feather
+                  name="bookmark"
+                  size={22}
+                  color={isSaved ? savedIconColor : currentTheme.textSecondary}
+                  fill={isSaved ? savedIconColor : "none"} // Fill icon when saved
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {/* Main Content */}
@@ -811,6 +856,34 @@ export default function HomeScreen() {
         </TouchableOpacity>
       </View>
 
+      {/* ---- NEW: Horizontal Scroll for Spontaneous Events ---- */}
+      {/* Only show this section if there are spontaneous events and not primary loading */}
+      {!loading &&
+        !isFetchingLocation &&
+        upcomingSpontaneousEvents.length > 0 && (
+          <View style={styles.spontaneousSection}>
+            <Text
+              style={[
+                styles.sectionHeader,
+                { color: currentTheme.textPrimary },
+              ]}
+            >
+              🔥 Happening Soon!
+            </Text>
+            <FlatList
+              horizontal
+              data={upcomingSpontaneousEvents}
+              renderItem={renderPostCard} // You can reuse renderPostCard
+              // Consider creating a more compact card version for horizontal lists later
+              keyExtractor={(item) => `spontaneous-${item.id}`} // Unique key prefix
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.horizontalListContainer}
+              ItemSeparatorComponent={() => <View style={{ width: 10 }} />} // Optional spacing
+            />
+          </View>
+        )}
+      {/* ---- END: Horizontal Scroll for Spontaneous Events ---- */}
+
       {/* Main Content: List or Loading/Empty State */}
       {loading || isFetchingLocation ? (
         <View style={styles.centerStatusContainer}>
@@ -828,7 +901,7 @@ export default function HomeScreen() {
             </Text>
           )}
         </View>
-      ) : posts.length === 0 ? (
+      ) : posts.length === 0 && upcomingSpontaneousEvents.length === 0 ? (
         <ScrollView
           contentContainerStyle={styles.centerStatusContainer}
           refreshControl={
@@ -860,7 +933,9 @@ export default function HomeScreen() {
         </ScrollView>
       ) : (
         <FlatList
-          data={posts}
+          data={posts.filter(
+            (p) => !upcomingSpontaneousEvents.find((sp) => sp.id === p.id)
+          )}
           renderItem={renderPostCard}
           keyExtractor={(item) => item.id}
           contentContainerStyle={styles.listContainer}
@@ -962,12 +1037,10 @@ export default function HomeScreen() {
                         ]}
                       >
                         {selectedPost.date instanceof Timestamp
-                          ? selectedPost.date
-                              .toDate()
-                              .toLocaleString([], {
-                                dateStyle: "full",
-                                timeStyle: "short",
-                              })
+                          ? selectedPost.date.toDate().toLocaleString([], {
+                              dateStyle: "full",
+                              timeStyle: "short",
+                            })
                           : new Date(selectedPost.date).toLocaleString([], {
                               dateStyle: "full",
                               timeStyle: "short",
@@ -1771,5 +1844,36 @@ const styles = StyleSheet.create({
     marginLeft: 10,
     borderWidth: 0,
     // Dynamic background and border color
+  },
+  // ---- Styles for the Spontaneous Section ----
+  spontaneousSection: {
+    paddingVertical: 10,
+    // Optional: add a border or slightly different background for this section
+    // borderBottomWidth: StyleSheet.hairlineWidth,
+    // borderBottomColor: currentTheme.separator, // Use theme color
+  },
+  sectionHeader: {
+    // You might already have a similar style
+    fontSize: 18,
+    fontWeight: "bold",
+    marginLeft: 15, // Align with card padding or screen padding
+    marginBottom: 10, // Space between header and list
+    // color: currentTheme.textPrimary, // Set dynamically
+  },
+  horizontalListContainer: {
+    paddingHorizontal: 10, // Start cards a bit inset from the edge
+    paddingVertical: 5,
+  },
+  // Spontaneous badge styles from your renderPostCard, ensure they are here
+  spontaneousBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    marginRight: 8,
+  },
+  spontaneousBadgeText: {
+    color: "#fff", // Consider using currentTheme.onErrorText or similar
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });

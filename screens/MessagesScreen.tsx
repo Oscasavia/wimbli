@@ -185,7 +185,6 @@ export default function MessagesScreen() {
           const anyUnread = sorted.some((group) => group.isUnread === true);
           setHasUnreadMessages(anyUnread);
           console.log(`MessagesScreen: Overall unread status: ${anyUnread}`);
-          // setHasUnreadMessages(false); // Default on error
         } catch (error) {
           console.error("MessagesScreen: Error processing groups:", error);
         } finally {
