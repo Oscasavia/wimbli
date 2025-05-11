@@ -1684,10 +1684,11 @@ const styles = StyleSheet.create({
     elevation: 1,
   },
   picker: {
-    width: "100%",
+    width: "95%",
     height: "100%",
     // Dynamic color
     backgroundColor: "transparent",
+    marginLeft: 10,
   },
   drawerCloseButton: {
     flexDirection: "row",

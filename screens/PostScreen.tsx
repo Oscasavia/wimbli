@@ -726,10 +726,11 @@ const styles = StyleSheet.create({
     elevation: 0.5,
   },
   picker: {
-    width: "100%",
+    width: "95%",
     height: "100%", // Ensure picker fills container
     // Minimal styling here, container handles appearance
     backgroundColor: "transparent", // Make picker background transparent
+    marginLeft: 10,
   },
   dateTriggerContainer: {
     flex: 1,
