@@ -332,7 +332,10 @@ const HARDCODED_BAD_WORDS_LIST: string[] = [
   "loli",
   "terrorist",
   "isis",
-  "goddamn"
+  "goddamn",
+  "shit",
+  "shitty",
+  "shithead"
 ]; // Replace with your initial list
 
 /**

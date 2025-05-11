@@ -376,6 +376,7 @@ export default function HomeScreen() {
       selectedFee,
       userLocation,
       getUserLocation,
+      userInterests,
     ])
   );
 
