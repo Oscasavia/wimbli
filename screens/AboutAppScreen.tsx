@@ -7,6 +7,7 @@ import {
   StyleSheet,
   ScrollView,
   Image,
+  TouchableOpacity,
   Platform,
   StatusBar,
 } from "react-native";
@@ -14,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useNavigation } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext"; // Adjust path if needed
 import { lightTheme, darkTheme } from "../themeColors"; // Adjust path if needed
+import { Feather } from "@expo/vector-icons"; // Use Feather
 import * as Application from "expo-application"; // For App Version
 
 export default function AboutAppScreen() {
@@ -53,17 +55,30 @@ export default function AboutAppScreen() {
       />
       <View
         style={[
-          styles.headerContainer,
-          {
-            backgroundColor: cardBackgroundColor,
-            borderBottomColor: currentTheme.separator,
-          },
-        ]}
-      >
-        {/* Screen Title */}
-        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
-          About App
-        </Text>
+            styles.headerContainer,
+            {
+              backgroundColor: cardBackgroundColor,
+              borderBottomColor: currentTheme.separator,
+              flexDirection: "row",
+              alignItems: "center",
+            },
+          ]}
+        >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Feather
+              name="arrow-left"
+              size={24}
+              color={currentTheme.textPrimary}
+            />
+          </TouchableOpacity>
+          <Text
+            style={[styles.screenTitle, { color: currentTheme.textPrimary }]}
+          >
+            About App
+          </Text>
       </View>
       <ScrollView contentContainerStyle={styles.scrollContainer}>
         {/* Logo Area */}
@@ -151,17 +166,18 @@ const styles = StyleSheet.create({
     // borderBottomColor: currentTheme.separator,
     alignItems: "center",
   },
+  backButton: {
+    paddingRight: 10,
+    paddingVertical: 5,
+    paddingLeft: 5,
+    marginRight: 10,
+  },
   screenTitle: {
-    // fontSize: 24,
-    // fontWeight: "bold",
-    // textAlign: "center",
-    // marginVertical: 15, // Add vertical margin for spacing
-    // paddingHorizontal: 20, // Ensure padding if text wraps
-    // marginTop: "1.9%",
-    // marginBottom: 4,
     fontSize: 20,
     fontWeight: "bold",
-    // color: currentTheme.textPrimary,
+    flex: 1,
+    textAlign: "center",
+    marginRight: 45, // balances the left icon space
   },
   scrollContainer: {
     flexGrow: 1, // Ensure content can fill space if short, or scroll if long

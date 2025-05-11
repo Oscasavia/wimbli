@@ -19,7 +19,7 @@ import { lightTheme, darkTheme } from "../themeColors"; // Adjust path if needed
 // Define the specific navigation prop type
 type NavigationProp = NativeStackNavigationProp<RootStackParamList, "Splash">;
 
-const MIN_SPLASH_DURATION = 1500; // Minimum time splash is visible (in ms)
+const MIN_SPLASH_DURATION = 3000; // Minimum time splash is visible (in ms)
 
 const SplashScreen = () => {
   const navigation = useNavigation<NavigationProp>();
@@ -91,7 +91,7 @@ const SplashScreen = () => {
         animation="pulse" // Choose animation: pulse, bounceIn, fadeIn, etc.
         easing="ease-in-out" // Animation easing
         iterationCount="infinite" // Loop 'pulse', use 1 for 'bounceIn'/'fadeIn'
-        duration={3000} // Animation duration per cycle
+        duration={1050} // Animation duration per cycle
       >
         <Image
           source={require("../assets/wimbli-icon-bg.png")} // Ensure path is correct
@@ -132,8 +132,8 @@ const styles = StyleSheet.create({
     // backgroundColor applied dynamically
   },
   logo: {
-    width: 100, // Slightly larger logo? Adjust as needed
-    height: 100,
+    width: 200, // Slightly larger logo? Adjust as needed
+    height: 200,
     resizeMode: "contain",
   },
   indicator: {

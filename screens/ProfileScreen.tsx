@@ -782,7 +782,7 @@ const styles = StyleSheet.create({
   // --- Settings Menu Modal Styles ---
   settingsMenuOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0, 0, 0, 0.1.5)", // Semi-transparent overlay
+    backgroundColor: "rgba(0, 0, 0, 0.15)", // Semi-transparent overlay
     // Align menu to top-right (adjust based on icon position)
     // justifyContent: "flex-start",
     // alignItems: "flex-end",

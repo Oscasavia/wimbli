@@ -368,7 +368,7 @@ export default function SignupScreen() {
                   style={[styles.linkHighlight, { color: linkColor }]}
                   onPress={() =>
                     navigation.navigate("WebView", {
-                      url: "https://lovely-unicorn-a7167c.netlify.app/",
+                      url: "https://doc-hosting.flycricket.io/wimbli/39b6735d-5a3a-4cad-a01c-1c6918641729/privacy",
                     })
                   } // Replace with your actual URL
                 >

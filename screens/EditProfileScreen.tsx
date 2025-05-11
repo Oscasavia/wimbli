@@ -284,9 +284,21 @@ export default function EditProfileScreen() {
             {
               backgroundColor: cardBackgroundColor,
               borderBottomColor: currentTheme.separator,
+              flexDirection: "row",
+              alignItems: "center",
             },
           ]}
         >
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Feather
+              name="arrow-left"
+              size={24}
+              color={currentTheme.textPrimary}
+            />
+          </TouchableOpacity>
           <Text
             style={[styles.screenTitle, { color: currentTheme.textPrimary }]}
           >
@@ -495,6 +507,12 @@ const styles = StyleSheet.create({
   screen: {
     // flex: 1,
   },
+  backButton: {
+    paddingRight: 10,
+    paddingVertical: 5,
+    paddingLeft: 5,
+    marginRight: 10,
+  },
   headerContainer: {
     padding: 15,
     // backgroundColor: currentTheme.cardBackground,
@@ -516,6 +534,9 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 20,
     fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
+    marginRight: 45, // balances the left icon space
   },
   loadingContainer: {
     flex: 1,

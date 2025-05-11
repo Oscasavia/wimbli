@@ -238,9 +238,21 @@ export default function SettingsScreen() {
           {
             backgroundColor: cardBackgroundColor,
             borderBottomColor: currentTheme.separator,
+            flexDirection: "row",
+            alignItems: "center",
           },
         ]}
       >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Feather
+            name="arrow-left"
+            size={24}
+            color={currentTheme.textPrimary}
+          />
+        </TouchableOpacity>
         <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
           Settings
         </Text>
@@ -360,7 +372,10 @@ export default function SettingsScreen() {
             "shield",
             "Privacy Policy",
             renderChevron(),
-            () => handleOpenURL("https://lovely-unicorn-a7167c.netlify.app/"),
+            () =>
+              handleOpenURL(
+                "https://doc-hosting.flycricket.io/wimbli/39b6735d-5a3a-4cad-a01c-1c6918641729/privacy"
+              ),
             false
           )}
           {renderSettingRow(
@@ -458,6 +473,12 @@ const styles = StyleSheet.create({
   screenContainer: {
     flex: 1,
   },
+  backButton: {
+    paddingRight: 10,
+    paddingVertical: 5,
+    paddingLeft: 5,
+    marginRight: 10,
+  },
   headerContainer: {
     padding: 15,
     // backgroundColor: currentTheme.cardBackground,
@@ -479,6 +500,9 @@ const styles = StyleSheet.create({
   screenTitle: {
     fontSize: 20,
     fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
+    marginRight: 45, // balances the left icon space
   },
   scrollContainer: {
     paddingHorizontal: 12,

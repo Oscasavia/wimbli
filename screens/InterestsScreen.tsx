@@ -324,8 +324,9 @@ const styles = StyleSheet.create({
     opacity: 0.6, // More pronounced disabled state
   },
   skipButton: {
-    marginTop: 15, // Space above skip
+    marginTop: 12, // Space above skip
     padding: 10, // Easier to tap
+    marginBottom: 12,
   },
   skipText: {
     textAlign: "center",

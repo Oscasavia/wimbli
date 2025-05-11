@@ -209,10 +209,19 @@ export default function ChangePasswordScreen() {
         },
       }),
     },
+    backButton: {
+      paddingRight: 10,
+      paddingVertical: 5,
+      paddingLeft: 5,
+      marginRight: 10,
+    },
     headerTitle: {
       fontSize: 20,
       fontWeight: "bold",
       color: currentTheme.textPrimary,
+      flex: 1,
+      textAlign: "center",
+      marginRight: 45, // balances the left icon space
     },
   });
 
@@ -223,8 +232,28 @@ export default function ChangePasswordScreen() {
         backgroundColor={currentTheme.cardBackground}
       />
       {/* If not using react-navigation header, you can uncomment this custom header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>Change Password</Text>
+      <View
+        style={[
+          styles.header,
+          {
+            flexDirection: "row",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Feather
+            name="arrow-left"
+            size={24}
+            color={currentTheme.textPrimary}
+          />
+        </TouchableOpacity>
+        <Text style={[styles.headerTitle, { color: currentTheme.textPrimary }]}>
+          Change Password
+        </Text>
       </View>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.inputContainer}>

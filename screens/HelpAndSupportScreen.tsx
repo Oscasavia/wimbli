@@ -182,17 +182,30 @@ export default function HelpAndSupportScreen() {
       />
       <View
         style={[
-          styles.headerContainer,
-          {
-            backgroundColor: cardBackgroundColor,
-            borderBottomColor: currentTheme.separator,
-          },
-        ]}
-      >
-        {/* Screen Title */}
-        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
-          Help And Support
-        </Text>
+                    styles.headerContainer,
+                    {
+                      backgroundColor: cardBackgroundColor,
+                      borderBottomColor: currentTheme.separator,
+                      flexDirection: "row",
+                      alignItems: "center",
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    onPress={() => navigation.goBack()}
+                    style={styles.backButton}
+                  >
+                    <Feather
+                      name="arrow-left"
+                      size={24}
+                      color={currentTheme.textPrimary}
+                    />
+                  </TouchableOpacity>
+                  <Text
+                    style={[styles.screenTitle, { color: currentTheme.textPrimary }]}
+                  >
+                    Help And Support
+                  </Text>
       </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
@@ -313,9 +326,18 @@ const styles = StyleSheet.create({
     }),
     zIndex: 10, // Ensures it stays above the list in case of overlap
   },
+  backButton: {
+    paddingRight: 10,
+    paddingVertical: 5,
+    paddingLeft: 5,
+    marginRight: 10,
+  },
   screenTitle: {
     fontSize: 20,
     fontWeight: "bold",
+    flex: 1,
+    textAlign: "center",
+    marginRight: 45, // balances the left icon space
   },
   scrollContainer: {
     paddingHorizontal: 12,

@@ -2,7 +2,7 @@
   "expo": {
     "name": "wimbli",
     "slug": "wimbli",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "orientation": "portrait",
     "icon": "./assets/wimbli-icon-bg.png",
     "userInterfaceStyle": "light",
@@ -19,10 +19,16 @@
       "adaptiveIcon": {
         "foregroundImage": "./assets/wimbli-icon-bg.png",
         "backgroundColor": "#E0F7FA"
-      }
+      },
+      "package": "com.oscasavia.wimbli"
     },
     "web": {
       "favicon": "./assets/wimbli-icon-bg.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "4cbd3782-8b02-4a1f-911f-234a0761e2bb"
+      }
     }
   }
 }

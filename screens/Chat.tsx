@@ -735,6 +735,19 @@ export default function Chat() {
       >
         {/* Header content using groupTitle etc. */}
         <View style={{ flexDirection: "row", alignItems: "center", flex: 1 }}>
+          {/* Back Button */}
+          <TouchableOpacity
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <Feather
+              name="arrow-left"
+              size={24}
+              color={currentTheme.textPrimary}
+            />
+          </TouchableOpacity>
+
+          {/* Title */}
           <Text
             numberOfLines={1}
             style={[
@@ -742,18 +755,19 @@ export default function Chat() {
               {
                 color: currentTheme.textPrimary,
                 flex: 1,
-                textAlign: "left", // Keep title aligned left
-                //  fontSize: 20, // Font size already in style
+                textAlign: "center",
+                marginLeft: -24, // Center compensation due to back button
               },
             ]}
           >
             {groupTitle}
           </Text>
-          {/* Keep the options button */}
+
+          {/* Options Menu */}
           {auth.currentUser?.uid && groupCreatorId && (
             <TouchableOpacity
               onPress={showGroupOptions}
-              style={{ paddingHorizontal: 6 }} // Tappable area
+              style={styles.optionsButton}
             >
               <Feather
                 name="more-vertical"
@@ -935,6 +949,13 @@ const styles = StyleSheet.create({
       },
     }),
     zIndex: 10, // Ensures it stays above the list in case of overlap
+  },
+  backButton: {
+    padding: 5,
+    marginRight: 25,
+  },
+  optionsButton: {
+    paddingHorizontal: 6,
   },
   screenTitle: {
     fontSize: 20,
