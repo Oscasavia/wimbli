@@ -182,40 +182,43 @@ export default function HelpAndSupportScreen() {
       />
       <View
         style={[
-                    styles.headerContainer,
-                    {
-                      backgroundColor: cardBackgroundColor,
-                      borderBottomColor: currentTheme.separator,
-                      flexDirection: "row",
-                      alignItems: "center",
-                    },
-                  ]}
-                >
-                  <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backButton}
-                  >
-                    <Feather
-                      name="arrow-left"
-                      size={24}
-                      color={currentTheme.textPrimary}
-                    />
-                  </TouchableOpacity>
-                  <Text
-                    style={[styles.screenTitle, { color: currentTheme.textPrimary }]}
-                  >
-                    Help And Support
-                  </Text>
+          styles.headerContainer,
+          {
+            backgroundColor: cardBackgroundColor,
+            borderBottomColor: currentTheme.separator,
+            flexDirection: "row",
+            alignItems: "center",
+          },
+        ]}
+      >
+        <TouchableOpacity
+          onPress={() => navigation.goBack()}
+          style={styles.backButton}
+        >
+          <Feather
+            name="arrow-left"
+            size={24}
+            color={currentTheme.textPrimary}
+          />
+        </TouchableOpacity>
+        <Text style={[styles.screenTitle, { color: currentTheme.textPrimary }]}>
+          Help And Support
+        </Text>
       </View>
       <ScrollView
         contentContainerStyle={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
       >
         {/* == Section: FAQs == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
             style={[
-              styles.sectionHeader,
+              styles.cardHeader,
               { color: currentTheme.textSecondary },
             ]}
           >
@@ -227,7 +230,7 @@ export default function HelpAndSupportScreen() {
               style={[
                 styles.faqItem, // Use specific style for FAQ content padding
                 { backgroundColor: cardBackgroundColor },
-                index === 0 && styles.firstRow, // Apply radius to first
+                // index === 0 && styles.firstRow, // Apply radius to first
                 index === faqs.length - 1 && styles.lastRow, // Apply radius to last
                 // Add separator line between items
                 index < faqs.length - 1 && {
@@ -258,22 +261,24 @@ export default function HelpAndSupportScreen() {
         </View>
 
         {/* == Section: Contact Us == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
-            style={[
-              styles.sectionHeader,
-              { color: currentTheme.textSecondary },
-            ]}
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
           >
-            Contact & Support
+            Rate & Share
           </Text>
           {renderInfoRow(
             "mail",
             "Email Support",
             renderChevron(), // Show chevron for tappable row
             handleContactEmail,
-            true, // isFirstInSection
-            false // Not last if Report Issue is below
+            false // isFirstInSection
+            // false // Not last if Report Issue is below
           )}
           {/* Uncomment if you have a help website
                       {renderInfoRow(
@@ -343,6 +348,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingTop: 15, // Space below header
     paddingBottom: 30,
+  },
+  card: {
+    width: "100%",
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  cardHeader: {
+    fontSize: 16,
+    fontWeight: "bold",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    padding: 15,
   },
   cardShadow: {
     // Optional shadow for card look

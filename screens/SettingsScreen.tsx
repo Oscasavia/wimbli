@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Platform, // Added Platform
   ActivityIndicator, // Added for delete/logout potentially
   Linking,
+  Share,
 } from "react-native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
@@ -22,7 +23,8 @@ import { signOut, deleteUser } from "firebase/auth";
 import { useNavigation } from "@react-navigation/native";
 import * as Application from "expo-application"; // For App Version
 
-// Removed LinearGradient
+const APP_NAME = "Wimbli"; // <-- Your App Name (used in share message, etc.)
+const PLAY_STORE_PACKAGE = "com.oscasavia.wimbli";
 
 export default function SettingsScreen() {
   const { theme, toggleTheme } = useTheme();
@@ -162,6 +164,44 @@ export default function SettingsScreen() {
     }
   };
 
+  // --- NEW: Handler for Rate App --- (Android Only)
+  const handleRateApp = useCallback(async (): Promise<void> => {
+    const url = `market://details?id=${PLAY_STORE_PACKAGE}`;
+    // Note: `Linking.canOpenURL` might return false for `market://` on some emulators/devices without Play Store.
+    // It's generally safe to attempt opening directly on release builds for Android.
+    try {
+      await Linking.openURL(url);
+    } catch (err) {
+      // Fallback to web URL if market link fails
+      const webUrl = `https://play.google.com/store/apps/details?id=${PLAY_STORE_PACKAGE}`;
+      const supportedWeb = await Linking.canOpenURL(webUrl);
+      if (supportedWeb) {
+        await Linking.openURL(webUrl);
+      } else {
+        Alert.alert("Error", "Could not open the Play Store link.");
+        console.error("Failed to open Play Store URL:", err);
+      }
+    }
+  }, []); // No dependency needed if PLAY_STORE_PACKAGE is constant
+
+  // --- NEW: Handler for Share App --- (Android Only)
+  const handleShareApp = useCallback(async (): Promise<void> => {
+    try {
+      const playStoreLink = `https://play.google.com/store/apps/details?id=${PLAY_STORE_PACKAGE}`;
+      await Share.share({
+        // Title is optional, used in some share targets
+        title: `Share ${APP_NAME}`,
+        // Message is the main content shared
+        message: `Check out ${APP_NAME}, a helpful app for tracking finances!\n${playStoreLink}`,
+        // URL is primarily for iOS, but doesn't hurt to include
+        url: playStoreLink,
+      });
+    } catch (error: any) {
+      Alert.alert("Error", "Could not share the app at this moment.");
+      console.error("Share App Error:", error.message);
+    }
+  }, []); // No dependency needed if constants are used
+
   // --- Render Helper for Settings Row ---
   const renderSettingRow = (
     iconName: keyof typeof Feather.glyphMap, // Ensure icon name is valid
@@ -263,12 +303,14 @@ export default function SettingsScreen() {
         showsVerticalScrollIndicator={false}
       >
         {/* == Section: Appearance == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
-            style={[
-              styles.sectionHeader,
-              { color: currentTheme.textSecondary },
-            ]}
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
           >
             Appearance
           </Text>
@@ -288,18 +330,20 @@ export default function SettingsScreen() {
               ios_backgroundColor="#3e3e3e" // iOS specific track background
             />,
             undefined, // onPress is handled by Switch
-            true, // isFirstInSection
+            false, // isFirstInSection
             true // isLastInSection
           )}
         </View>
 
         {/* == Section: Account == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
-            style={[
-              styles.sectionHeader,
-              { color: currentTheme.textSecondary },
-            ]}
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
           >
             Account
           </Text>
@@ -308,7 +352,7 @@ export default function SettingsScreen() {
             "Edit Profile",
             renderChevron(),
             () => navigation.navigate("EditProfile"), // Navigate to Edit Profile Screen
-            true // isFirstInSection
+            false, // isFirstInSection
           )}
           {renderSettingRow(
             "lock",
@@ -321,12 +365,14 @@ export default function SettingsScreen() {
         </View>
 
         {/* == Section: Preferences == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
-            style={[
-              styles.sectionHeader,
-              { color: currentTheme.textSecondary },
-            ]}
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
           >
             Preferences
           </Text>
@@ -339,18 +385,20 @@ export default function SettingsScreen() {
                 "Coming Soon",
                 "Notification settings will be added later."
               ), // Placeholder action
-            true, // isFirstInSection
+            false, // isFirstInSection
             true // isLastInSection
           )}
         </View>
 
         {/* == Section: About & Support == */}
-        <View style={styles.section}>
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
           <Text
-            style={[
-              styles.sectionHeader,
-              { color: currentTheme.textSecondary },
-            ]}
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
           >
             About & Support
           </Text>
@@ -359,7 +407,7 @@ export default function SettingsScreen() {
             "Help & Support",
             renderChevron(),
             () => navigation.navigate("HelpAndSupport"), // Placeholder action
-            true // isFirstInSection
+            false
           )}
           {renderSettingRow(
             "info",
@@ -386,6 +434,35 @@ export default function SettingsScreen() {
               handleOpenURL("https://cerulean-biscotti-582837.netlify.app/"),
             false, // isFirstInSection
             true // isLastInSection
+          )}
+        </View>
+
+        <View
+          style={[
+            styles.card,
+            { backgroundColor: currentTheme.cardBackground },
+          ]}
+        >
+          <Text
+            style={[styles.cardHeader, { color: currentTheme.textSecondary }]}
+          >
+            Rate & Share
+          </Text>
+          {renderSettingRow(
+            "star",
+            "Rate App",
+            renderChevron(),
+            () => handleRateApp(),
+            // false,
+            false
+          )}
+          {renderSettingRow(
+            "share-2",
+            "Share App with friends",
+            renderChevron(),
+            () => handleShareApp(),
+            false,
+            true
           )}
         </View>
 
@@ -509,6 +586,21 @@ const styles = StyleSheet.create({
     paddingTop: 15, // Space below header
     paddingBottom: 30,
   },
+  card: {
+    width: "100%",
+    borderRadius: 25,
+    shadowColor: "#000",
+    shadowOpacity: 0.08,
+    elevation: 3,
+    marginBottom: 20,
+  },
+  cardHeader: {
+    fontSize: 16,
+    fontWeight: "bold",
+    borderBottomWidth: 1,
+    borderBottomColor: "#eee",
+    padding: 15,
+  },
   // Removed custom title style
   section: {
     marginBottom: 15, // Space between sections
@@ -530,6 +622,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 15,
     // backgroundColor set dynamically (cardBackground)
     // borderRadius applied conditionally
+  },
+  settingRowText: {
+    flex: 1, // Allow text to take remaining space
+    fontSize: 14,
+    color: "#495057",
   },
   firstRow: {
     borderTopLeftRadius: 25,
