@@ -1,4 +1,5 @@
 // Chat.tsx
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import {
   View,

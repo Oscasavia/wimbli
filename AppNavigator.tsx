@@ -1,4 +1,5 @@
 // AppNavigator.tsx (Upgraded UI)
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React from "react";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { Feather } from "@expo/vector-icons"; // Use Feather consistently

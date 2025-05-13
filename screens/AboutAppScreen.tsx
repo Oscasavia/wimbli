@@ -1,5 +1,5 @@
 // screens/AboutAppScreen.tsx
-
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React, { useEffect, useState } from "react";
 import {
   View,

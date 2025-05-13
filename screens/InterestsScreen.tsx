@@ -1,3 +1,4 @@
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React, { useState } from "react";
 import {
   View,

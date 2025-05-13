@@ -1,3 +1,4 @@
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React, { useEffect, useState, useRef } from "react";
 import {
   View,

@@ -1,4 +1,5 @@
 // App.tsx (Revised Structure)
+// © 2025 Oscasavia Birungi. All rights reserved.
 import React, { useEffect, useState, useRef } from "react"; // Removed useRef if unused
 import { NavigationContainer } from "@react-navigation/native"; // Removed ref hook and actions if unused
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
