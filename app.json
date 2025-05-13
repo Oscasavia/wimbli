@@ -2,7 +2,7 @@
   "expo": {
     "name": "wimbli",
     "slug": "wimbli",
-    "version": "1.1.1",
+    "version": "1.1.2",
     "orientation": "portrait",
     "icon": "./assets/wimbli-icon-bg.png",
     "userInterfaceStyle": "light",
