@@ -28,6 +28,7 @@ import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCurrency } from "../CurrencyContext";
 import { Feather } from "@expo/vector-icons"; // Use Feather icons
 // Removed LinearGradient
 
@@ -48,6 +49,7 @@ export default function ManagePostsScreen() {
   const navigation = useNavigation<any>();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
+  const { getSymbol } = useCurrency();
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
@@ -263,7 +265,7 @@ export default function ManagePostsScreen() {
                 { color: currentTheme.textPrimary, fontWeight: "600" },
               ]}
             >
-              {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+              {item.fee === 0 ? "Free" : `${getSymbol()}${item.fee.toFixed(2)}`}
             </Text>
           </View>
         </View>

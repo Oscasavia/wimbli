@@ -41,6 +41,7 @@ import { db, auth } from "../firebase";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import { Picker } from "@react-native-picker/picker";
 import { onAuthStateChanged } from "firebase/auth";
+import { useCurrency } from "../CurrencyContext";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Feather } from "@expo/vector-icons"; // Use Feather exclusively
@@ -110,9 +111,10 @@ export default function HomeScreen() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const { getSymbol } = useCurrency();
   const [userInterests, setUserInterests] = useState<string[]>([]); // User's saved interests
   const [selectedCategory, setSelectedCategory] = useState<string>("All"); // Filter state
-  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc"); // Default to newest first
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("asc"); // Default to newest first
   const [savedPosts, setSavedPosts] = useState<string[]>([]); // Local state for saved post IDs (Needs Persistence)
   const [searchText, setSearchText] = useState("");
   const [isDetailsModalVisible, setIsDetailsModalVisible] = useState(false);
@@ -787,7 +789,7 @@ export default function HomeScreen() {
                   { color: currentTheme.textSecondary, fontWeight: "600" },
                 ]}
               >
-                {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+                {item.fee === 0 ? "Free" : `${getSymbol()}${item.fee.toFixed(2)}`}
               </Text>
             </View>
           </View>
@@ -828,8 +830,8 @@ export default function HomeScreen() {
           ]}
         >
           <Text style={[styles.appName, { color: currentTheme.primary }]}>
-                      Wimbli
-                    </Text>
+            Wimbli
+          </Text>
           {/* <Feather
             name="search"
             size={20}
@@ -866,7 +868,12 @@ export default function HomeScreen() {
       {!loading &&
         !isFetchingLocation &&
         upcomingSpontaneousEvents.length > 0 && (
-          <View style={[styles.spontaneousSection, {borderBottomColor: currentTheme.separator,}]}>
+          <View
+            style={[
+              styles.spontaneousSection,
+              { borderBottomColor: currentTheme.separator },
+            ]}
+          >
             <Text
               style={[
                 styles.sectionHeader,
@@ -1105,7 +1112,7 @@ export default function HomeScreen() {
                       >
                         {selectedPost.fee === 0
                           ? "Free Event"
-                          : `$${selectedPost.fee.toFixed(2)}`}
+                          : `${getSymbol()}${selectedPost.fee.toFixed(2)}`}
                       </Text>
                     </View>
                   </View>
@@ -1304,8 +1311,8 @@ export default function HomeScreen() {
                     dropdownIconColor={currentTheme.textPrimary}
                     prompt="Sort Order"
                   >
-                    <Picker.Item label="Newest First" value="desc" />
-                    <Picker.Item label="Oldest First" value="asc" />
+                    <Picker.Item label="Sooner Events First" value="asc" />
+                    <Picker.Item label="Later Events First" value="desc" />
                   </Picker>
                 </View>
               </View>

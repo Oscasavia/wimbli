@@ -28,6 +28,7 @@ import HelpAndSupportScreen from "./screens/HelpAndSupportScreen";
 import AboutAppScreen from "./screens/AboutAppScreen";
 import ChangePasswordScreen from "./screens/ChangePasswordScreen";
 import ProfileScreen from "./screens/ProfileScreen";
+import { CurrencyProvider } from "./CurrencyContext";
 import Chat from "./screens/Chat";
 
 const Stack = createNativeStackNavigator();
@@ -65,6 +66,7 @@ export default function App() {
   return (
     <ThemeProvider>
       <UnreadProvider>
+        <CurrencyProvider>
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName={initialRoute}
@@ -102,6 +104,7 @@ export default function App() {
             <Stack.Screen name="AboutApp" component={AboutAppScreen} />
           </Stack.Navigator>
         </NavigationContainer>
+        </CurrencyProvider>
       </UnreadProvider>
     </ThemeProvider>
   );

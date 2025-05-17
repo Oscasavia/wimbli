@@ -13,7 +13,9 @@ import {
   ActivityIndicator, // Added for delete/logout potentially
   Linking,
   Share,
+  Modal,
 } from "react-native";
+import { Picker } from "@react-native-picker/picker";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
@@ -23,6 +25,8 @@ import { doc, deleteDoc } from "firebase/firestore";
 import { signOut, deleteUser } from "firebase/auth";
 import { useNavigation } from "@react-navigation/native";
 import * as Application from "expo-application"; // For App Version
+import { useCurrency } from "../CurrencyContext";
+import { CurrencyOptions } from "../currencyOptions";
 
 const APP_NAME = "Wimbli"; // <-- Your App Name (used in share message, etc.)
 const PLAY_STORE_PACKAGE = "com.oscasavia.wimbli";
@@ -32,6 +36,8 @@ export default function SettingsScreen() {
   const navigation = useNavigation<any>();
   const isDark = theme === "dark";
   const currentTheme = isDark ? darkTheme : lightTheme;
+  const { currency, setCurrency } = useCurrency();
+  const [currencyModalVisible, setCurrencyModalVisible] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [appVersion, setAppVersion] = useState<string | null>(null);
@@ -353,7 +359,7 @@ export default function SettingsScreen() {
             "Edit Profile",
             renderChevron(),
             () => navigation.navigate("EditProfile"), // Navigate to Edit Profile Screen
-            false, // isFirstInSection
+            false // isFirstInSection
           )}
           {renderSettingRow(
             "lock",
@@ -387,7 +393,17 @@ export default function SettingsScreen() {
                 "Notification settings will be added later."
               ), // Placeholder action
             false, // isFirstInSection
-            true // isLastInSection
+            false // isLastInSection
+          )}
+          {renderSettingRow(
+            "dollar-sign",
+            "Currency",
+            <Text style={{ color: currentTheme.textSecondary }}>
+              {CurrencyOptions[currency]?.symbol || currency}
+            </Text>,
+            () => setCurrencyModalVisible(true),
+            false,
+            true
           )}
         </View>
 
@@ -432,7 +448,9 @@ export default function SettingsScreen() {
             "Terms of Service",
             renderChevron(),
             () =>
-              handleOpenURL("https://cerulean-biscotti-582837.netlify.app/"),
+              handleOpenURL(
+                "https://doc-hosting.flycricket.io/wimbliterms/3a40a76c-e818-41ef-9b59-07190589ceee/terms"
+              ),
             false, // isFirstInSection
             true // isLastInSection
           )}
@@ -539,6 +557,64 @@ export default function SettingsScreen() {
           </TouchableOpacity>
         </View>
 
+        <Modal
+          transparent
+          animationType="slide"
+          visible={currencyModalVisible}
+          onRequestClose={() => setCurrencyModalVisible(false)}
+        >
+          <View
+            style={{
+              flex: 1,
+              justifyContent: "flex-end",
+              backgroundColor: "rgba(0,0,0,0.5)",
+            }}
+          >
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: currentTheme.cardBackground,
+                  padding: 20,
+                  borderTopLeftRadius: 20,
+                  borderTopRightRadius: 20,
+                },
+              ]}
+            >
+              <Text
+                style={{
+                  color: currentTheme.textSecondary,
+                  fontWeight: "bold",
+                  fontSize: 16,
+                  marginBottom: 10,
+                }}
+              >
+                Select Currency
+              </Text>
+              <View
+                style={{
+                  height: StyleSheet.hairlineWidth,
+                  backgroundColor: separatorColor,
+                  marginBottom: 10,
+                }}
+              />
+              <Picker
+                style={{ color: currentTheme.textPrimary }}
+                dropdownIconColor={currentTheme.textPrimary}
+                selectedValue={currency}
+                onValueChange={(value) => {
+                  setCurrency(value);
+                  setCurrencyModalVisible(false);
+                }}
+              >
+                {Object.entries(CurrencyOptions).map(([code, { label }]) => (
+                  <Picker.Item key={code} label={label} value={code} />
+                ))}
+              </Picker>
+            </View>
+          </View>
+        </Modal>
+
         {/* Spacer at the bottom */}
         <View style={{ height: 30 }} />
       </ScrollView>
@@ -583,17 +659,17 @@ const styles = StyleSheet.create({
     marginRight: 45, // balances the left icon space
   },
   scrollContainer: {
-    paddingHorizontal: 12,
-    paddingTop: 15, // Space below header
+    paddingHorizontal: 5,
+    paddingTop: 5, // Space below header
     paddingBottom: 30,
   },
   card: {
     width: "100%",
-    borderRadius: 25,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     elevation: 3,
-    marginBottom: 20,
+    marginBottom: 5,
   },
   cardHeader: {
     fontSize: 16,
@@ -630,12 +706,12 @@ const styles = StyleSheet.create({
     color: "#495057",
   },
   firstRow: {
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   lastRow: {
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     borderBottomWidth: 0, // No bottom border on the last item
   },
   cardShadow: {

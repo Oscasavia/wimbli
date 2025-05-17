@@ -345,17 +345,17 @@ const styles = StyleSheet.create({
     marginRight: 45, // balances the left icon space
   },
   scrollContainer: {
-    paddingHorizontal: 12,
-    paddingTop: 15, // Space below header
+    paddingHorizontal: 5,
+    paddingTop: 5, // Space below header
     paddingBottom: 30,
   },
   card: {
     width: "100%",
-    borderRadius: 25,
+    borderRadius: 12,
     shadowColor: "#000",
     shadowOpacity: 0.08,
     elevation: 3,
-    marginBottom: 20,
+    marginBottom: 5,
   },
   cardHeader: {
     fontSize: 16,
@@ -393,12 +393,12 @@ const styles = StyleSheet.create({
     // backgroundColor set dynamically (cardBackground)
   },
   firstRow: {
-    borderTopLeftRadius: 25,
-    borderTopRightRadius: 25,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
   },
   lastRow: {
-    borderBottomLeftRadius: 25,
-    borderBottomRightRadius: 25,
+    borderBottomLeftRadius: 12,
+    borderBottomRightRadius: 12,
     borderBottomWidth: 0, // No bottom border on the last item
   },
   settingLeft: {

@@ -31,6 +31,7 @@ import {
   useFocusEffect,
 } from "@react-navigation/native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCurrency } from "../CurrencyContext";
 import { useTheme } from "../ThemeContext";
 import { lightTheme, darkTheme } from "../themeColors";
 import { Picker } from "@react-native-picker/picker";
@@ -75,6 +76,7 @@ export default function PostScreen() {
   const [category, setCategory] = useState("");
   const [location, setLocation] = useState("");
   const [date, setDate] = useState(new Date());
+  const { getSymbol } = useCurrency();
   const [fee, setFee] = useState(""); // Keep as string for input, parse on save
   const [isLoading, setIsLoading] = useState(false); // Saving state
   const [userLocation, setUserLocation] = useState<{
@@ -513,7 +515,7 @@ export default function PostScreen() {
 
           {/* Fee Input */}
           <Text style={[styles.label, { color: currentTheme.textPrimary }]}>
-            Fee ($)
+            Fee ({getSymbol()})
           </Text>
           <View
             style={[

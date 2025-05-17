@@ -14,6 +14,7 @@ import {
   Alert, // Added Alert
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useCurrency } from "../CurrencyContext";
 import { useNavigation, useFocusEffect } from "@react-navigation/native";
 import {
   doc,
@@ -48,6 +49,7 @@ type Post = {
 export default function SavedEventsScreen() {
   const navigation = useNavigation<any>();
   const [savedEvents, setSavedEvents] = useState<Post[]>([]);
+  const { getSymbol } = useCurrency();
   const [loading, setLoading] = useState(true);
   const { theme } = useTheme();
   const isDark = theme === "dark";
@@ -216,7 +218,7 @@ export default function SavedEventsScreen() {
     // potentially less clean than a dedicated screen.
     // For simplicity, let's assume a PostDetail screen exists or just log for now.
     console.log("Navigate to details for post:", post.id);
-    Alert.alert("Navigate", `Would navigate to details for "${post.title}"`);
+    Alert.alert("Navigate", `Navigate to 'Home' to get more details for "${post.title}"`);
   };
 
   // --- Render Helper for Saved Event Card ---
@@ -333,7 +335,7 @@ export default function SavedEventsScreen() {
                   { color: currentTheme.textSecondary, fontWeight: "600" },
                 ]}
               >
-                {item.fee === 0 ? "Free" : `$${item.fee.toFixed(2)}`}
+                {item.fee === 0 ? "Free" : `${getSymbol()}${item.fee.toFixed(2)}`}
               </Text>
             </View>
           </View>
